@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Xcode ${{ matrix.xcode }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    # The canary leg reports; it does not gate. A red canary means an OS changed something Appendix A of
+    # ARCHITECTURE.md relies on, which is a bug to file, not a reason to block an unrelated pull request.
+    continue-on-error: ${{ matrix.canary }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            xcode: "26.4"
+            canary: false
+          - os: macos-15
+            xcode: "26.3"
+            canary: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${{ matrix.xcode }}.app"
+          swift --version
+
+      # Core Data writes the fixtures, so what is on disk depends on the OS build as well as on the generator.
+      - name: Describe the image
+        id: image
+        run: |
+          echo "os=$(sw_vers -buildVersion)" >> "$GITHUB_OUTPUT"
+          echo "swift=$(swift --version 2>&1 | head -1 | shasum | cut -c1-12)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: build-${{ matrix.os }}-${{ steps.image.outputs.swift }}-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: |
+            build-${{ matrix.os }}-${{ steps.image.outputs.swift }}-${{ hashFiles('Package.resolved') }}-
+
+      - name: Cache the fixture zoo
+        uses: actions/cache@v4
+        with:
+          path: Fixtures
+          key: fixtures-${{ steps.image.outputs.os }}-${{ hashFiles('Tools/**', 'Package.resolved') }}
+
+      - name: Build
+        run: swift build --build-tests
+
+      # The tests build their own fixtures, so they also prove that the generator works on this image.
+      - name: Test
+        run: swift test --skip-build
+
+      - name: Load every fixture headlessly
+        run: Scripts/smoke.sh
+
+  lint:
+    name: Lint and layering
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # swift-format's output changes between toolchains; lint with the one the code was formatted with.
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
+
+      - name: Lint
+        run: Scripts/lint.sh
+
+      - name: Layering
+        run: Scripts/check-layering.sh
+
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Every commit is signed off
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: Scripts/check-dco.sh "$BASE" "$HEAD"

@@ -1,0 +1,44 @@
+name: Bug report
+description: Something does not work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never attach real user data.** If a store is needed to reproduce the problem, generate a minimal one.
+        Security problems: please use private vulnerability reporting instead (see SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CoreDataDabbi version or commit
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: macOS and Xcode versions
+  - type: dropdown
+    id: store
+    attributes:
+      label: Kind of store
+      options:
+        - Core Data (simulator app)
+        - Core Data (Mac app)
+        - SwiftData
+        - .xcappdata container
+        - Device pull
+        - Raw SQLite
+        - Not store related

@@ -1,0 +1,31 @@
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved.orig
+
+# Xcode
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Local signing overrides (see App/Config/Base.xcconfig)
+App/Config/Local.xcconfig
+
+# Generated fixture zoo (run Scripts/fixtures.sh). Anchored: Tools/FixtureKit/Fixtures/ is source.
+/Fixtures/
+
+# Release artefacts
+*.dmg
+*.zip
+*.xcarchive
+
+# macOS
+.DS_Store
+
+# Editors and agents
+.vscode/
+.idea/
+.serena/
+.codegraph/
