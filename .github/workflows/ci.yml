@@ -69,6 +69,47 @@ jobs:
       - name: Load every fixture headlessly
         run: Scripts/smoke.sh
 
+  app:
+    name: App (macOS 26)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app is built with Xcode, not SwiftPM: it needs a bundle, an Info.plist and a test host (ADR-06).
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
+
+      - name: Cache the build
+        uses: actions/cache@v4
+        with:
+          path: .build/xcode
+          key: app-macos-26-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: |
+            app-macos-26-${{ hashFiles('Package.resolved') }}-
+
+      # The app's tests write their own fixtures into a temporary folder, so there is nothing to cache for
+      # them. They do put windows on screen, which needs the runner's login session — xcodebuild has one.
+      - name: Test
+        env:
+          TEST_RUNNER_DABBI_SNAPSHOT_DIR: ${{ runner.temp }}/snapshots
+        run: Scripts/app.sh test
+
+      # Every user-visible string belongs in the String Catalog (§11). Xcode fills it on each build from the
+      # IDE; a pull request written from the command line would otherwise leave it behind.
+      - name: String Catalog is up to date
+        run: Scripts/app.sh strings --check
+
+      # What the windows looked like on this OS, for a reviewer who cannot run it. Nothing is compared against
+      # them; they are there to be looked at.
+      - name: Keep the snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshots
+          path: ${{ runner.temp }}/snapshots
+          if-no-files-found: ignore
+
   lint:
     name: Lint and layering
     runs-on: macos-26

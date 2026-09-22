@@ -191,6 +191,27 @@ private func makeDatabase() throws -> URL {
         }
     }
 
+    /// §6.2: a read-only connection *would* create the missing `-shm` — next to the user's store, and leave it
+    /// there. It must not get that far.
+    @Test func refusesAWALDatabaseWithoutItsSharedMemoryAndWritesNothing() throws {
+        let copy = try TestFixtures.scratchCopy(.walOnly)
+        try FileManager.default.removeItem(atPath: copy.storeURL.path + "-shm")
+        let before = try FileManager.default.contentsOfDirectory(atPath: copy.directory.path).sorted()
+
+        let error = try #require(#expect(throws: DabbiError.self) { try SQLiteConnection(readOnly: copy.storeURL) })
+        #expect(error.code == .readOnlyLocation)
+        #expect(error.diagnosis.first?.contains("-shm file is missing") == true)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: copy.directory.path).sorted() == before)
+
+        // Made self-contained — which is only ever done to a copy we own — it opens anywhere.
+        try SQLiteConnection.consolidate(ownedCopyAt: copy.storeURL)
+        #expect(
+            try FileManager.default.contentsOfDirectory(atPath: copy.directory.path).sorted()
+                == ["WALOnly.sqlite", "manifest.json"])
+        let connection = try SQLiteConnection(readOnly: copy.storeURL)
+        #expect(try connection.scalar("SELECT count(*) FROM ZNOTE")?.int64 == 20)
+    }
+
     @Test func neverOverwrites() throws {
         let url = try makeDatabase()
         let source = try SQLiteConnection(readOnly: url)

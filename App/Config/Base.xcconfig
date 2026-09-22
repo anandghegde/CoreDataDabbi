@@ -1,0 +1,32 @@
+// Build settings shared by every target and configuration. Settings live here, not in the project file, so
+// that they can be read, diffed and reviewed (ADR-06).
+
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+
+MACOSX_DEPLOYMENT_TARGET = 14.0
+SDKROOT = macosx
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_TREAT_WARNINGS_AS_ERRORS = NO
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+ALWAYS_SEARCH_USER_PATHS = NO
+CLANG_ENABLE_MODULES = YES
+COPY_PHASE_STRIP = NO
+LOCALIZATION_PREFERS_STRING_CATALOGS = YES
+SWIFT_EMIT_LOC_STRINGS = YES
+ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES
+DEAD_CODE_STRIPPING = YES
+
+// The app reads other apps' containers and simulator folders: it cannot be sandboxed (PRD §9.1). It is
+// hardened instead, with no exceptions.
+ENABLE_HARDENED_RUNTIME = YES
+ENABLE_APP_SANDBOX = NO
+
+// "Sign to Run Locally": a clone builds and runs without an Apple developer account. To sign with a team of
+// your own, create Config/Local.xcconfig (git-ignored) with DEVELOPMENT_TEAM and CODE_SIGN_IDENTITY in it.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

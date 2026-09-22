@@ -2,11 +2,11 @@
 import Foundation
 
 /// Ordered one-to-many (`Playlist.tracks`) and ordered many-to-many (`Playlist.featured`).
-enum OrderedFixture {
+public enum OrderedFixture {
     static let playlists = 3
     static let tracks = 12
 
-    static func makeModel() -> NSManagedObjectModel {
+    public static func makeModel() -> NSManagedObjectModel {
         let playlist = entity("Playlist", [attribute("name", .stringAttributeType)])
         let track = entity(
             "Track",

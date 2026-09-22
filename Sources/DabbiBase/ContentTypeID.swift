@@ -15,9 +15,13 @@ extension ContentTypeID {
     public static let webp: Self = "webp"
     public static let heic: Self = "heic"
     public static let pdf: Self = "pdf"
+    public static let svg: Self = "svg"
     public static let mpeg4: Self = "mpeg4"
+    public static let mpeg4Audio: Self = "m4a"
     public static let quickTime: Self = "quicktime"
     public static let binaryPlist: Self = "bplist"
+    /// An `NSKeyedArchiver` archive, in either property-list format.
+    public static let keyedArchive: Self = "keyedArchive"
     public static let xmlPlist: Self = "plist"
     public static let json: Self = "json"
     public static let xml: Self = "xml"
@@ -27,6 +31,8 @@ extension ContentTypeID {
     public static let zlib: Self = "zlib"
     public static let sqlite: Self = "sqlite"
     public static let text: Self = "text"
+    /// Text that is one URL and nothing else.
+    public static let link: Self = "link"
 }
 
 /// Magic-byte detection over a bounded prefix. Cheap enough to run for every blob cell in a page.
@@ -55,6 +61,7 @@ public enum MagicSniffer {
             switch brand {
             case "heic", "heix", "hevc", "mif1", "msf1", "avif": return .heic
             case "qt  ": return .quickTime
+            case "M4A ", "M4B ", "M4P ": return .mpeg4Audio
             default: return .mpeg4
             }
         }

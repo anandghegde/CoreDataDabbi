@@ -1,5 +1,6 @@
 @preconcurrency import CoreData
 import DabbiBase
+import DabbiSQLite
 import Foundation
 
 /// Where the model a store is browsed with came from. Shown next to the store so nobody has to guess (PRJ-5).
@@ -84,6 +85,8 @@ public struct StoreMetadata: Sendable, Hashable, Codable {
 
     /// Reads the metadata of the SQLite store at `url` without loading the store.
     public static func read(from url: URL) throws -> StoreMetadata {
+        // Core Data's read-only open creates a missing -shm just as SQLite's does (§6.2).
+        try SQLiteConnection.requireReadableInPlace(url)
         do {
             let metadata = try objcGuarded("The store's metadata could not be read.", code: .storeOpenFailed) {
                 try NSPersistentStoreCoordinator.metadataForPersistentStore(

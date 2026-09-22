@@ -4,10 +4,11 @@
 
 CoreDataDabbi is a **free, open-source** macOS developer tool for viewing, querying, editing, tracking and diffing the data inside **Core Data and SwiftData stores** — for Mac apps, apps in any Apple simulator, exported Xcode app containers and debug apps on physical devices. It never requires changes to the inspected app.
 
-> **Status: pre-alpha (milestone M0 — foundations).** The engine reads stores headlessly through the `dabbi` CLI. There is no app yet. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
+> **Status: pre-alpha — milestone M1, the viewer, is complete.** The Mac app opens a store — from a file, from a simulator, or dropped on the welcome window — and browses it read-only: entity tree, grid, inspector, relationships and a content viewer for blobs and archives. A 210 MB store with a million rows opens in under half a second and scrolls at 60 fps ([the numbers](docs/ARCHITECTURE.md#appendix-c--verified-in-m1-2026-09-20)). Querying, editing, tracking and diffing are still to come. See the [implementation plan](docs/IMPLEMENTATION_PLAN.md).
 
 ## What is here today
 
+- **CoreDataDabbi.app** — the read-only viewer. Browse Simulators, Open Database, or drop a store, an app bundle or an `.xcappdata` container on the welcome window.
 - `DabbiKit` — a UI-free Swift package (the engine) with a `Sendable` value-type API.
 - `dabbi` — a command-line front end used as the engine's harness:
 
@@ -20,7 +21,7 @@ CoreDataDabbi is a **free, open-source** macOS developer tool for viewing, query
 
 ## Build
 
-Requirements: macOS 14 or later, Xcode 16 or later (Swift 6). No accounts, secrets or extra tools.
+Requirements: macOS 14 or later, Xcode 16 or later (Swift 6) for the package; the app is built with Xcode 26. No accounts, secrets or extra tools.
 
 ```sh
 git clone https://github.com/anandghegde/CoreDataDabbi.git
@@ -28,6 +29,10 @@ cd CoreDataDabbi
 swift build
 swift test                 # the tests generate the fixtures they need
 Scripts/smoke.sh           # the CLI loads the whole fixture zoo (generated into Fixtures/ on first run)
+
+Scripts/app.sh build       # the Mac app
+Scripts/app.sh test
+open "$(Scripts/app.sh path)"
 ```
 
 ## How it works

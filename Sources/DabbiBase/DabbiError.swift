@@ -84,11 +84,31 @@ extension DabbiError.Code {
     public static let objectNotFound: Self = "store.objectNotFound"
     /// The pager belongs to an older session generation, or was closed.
     public static let stalePager: Self = "store.stalePager"
+    /// Persistent history was asked for on a store that does not record any.
+    public static let historyUnavailable: Self = "store.historyUnavailable"
+
+    // Projects
+    public static let projectUnreadable: Self = "project.unreadable"
+    /// The project was written by a newer version of the app, with a schema this one does not know.
+    public static let projectTooNew: Self = "project.tooNew"
+    public static let projectWriteFailed: Self = "project.writeFailed"
+
+    // Locating stores
+    /// A developer tool (`xcrun`, `simctl`) is not installed or could not be started.
+    public static let toolUnavailable: Self = "locator.toolUnavailable"
+    /// A tool ran and answered with something that cannot be read.
+    public static let toolOutputUnreadable: Self = "locator.toolOutputUnreadable"
+    /// A store location no longer leads to a file: the device, the app or the file is gone (PRJ-12).
+    public static let locationUnresolved: Self = "locator.unresolved"
 
     // Decoding
     public static let decompressionFailed: Self = "decode.decompressionFailed"
     /// A safety limit (inflated size, recursion depth, row cap) was hit.
     public static let limitExceeded: Self = "decode.limitExceeded"
+    /// Field content that claims a format (by its magic bytes) and does not follow it.
+    public static let contentMalformed: Self = "decode.malformed"
+    /// "Decode as" named a content type nobody registered a decoder for.
+    public static let noDecoder: Self = "decode.noDecoder"
 
     public static let objcException: Self = "internal.objcException"
     public static let `internal`: Self = "internal.error"

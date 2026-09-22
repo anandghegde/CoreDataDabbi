@@ -39,6 +39,7 @@ public final class SQLiteConnection {
     /// rather than with SQLite's terse "file is not a database".
     public convenience init(readOnly url: URL, options: Options = .init()) throws {
         _ = try SQLiteHeader.read(from: url)
+        try Self.requireReadableInPlace(url)
         try self.init(url: url, flags: SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, options: options)
 
         try execute("PRAGMA query_only = 1")
@@ -221,6 +222,46 @@ public final class SQLiteConnection {
         )
     }
 
+    /// Refuses a database with a write-ahead log and no `-shm` before SQLite sees it.
+    ///
+    /// Verified against the system SQLite (3.4x) and against Core Data with `NSReadOnlyPersistentStoreOption`:
+    /// whoever reads a WAL database needs its `-shm`, and a *read-only* connection that finds none creates one —
+    /// 32 KB next to the store, left behind when it closes. In a folder that cannot be written to the same open
+    /// fails with `SQLITE_CANTOPEN`. CoreDataDabbi does not write next to the user's stores, so both cases end
+    /// the same way: `.readOnlyLocation`, which the locator answers with a working copy (§6.2).
+    ///
+    /// SQLite decides by the log's existence alone, whatever its size and whatever the header says
+    /// (`pagerOpenWalIfPresent`); so does this. An app that is just starting can create the `-shm` between this
+    /// check and the open — then it is the app's file, and nothing of ours.
+    public static func requireReadableInPlace(_ url: URL) throws {
+        let files = FileManager.default
+        guard files.fileExists(atPath: url.path + "-wal"), !files.fileExists(atPath: url.path + "-shm") else { return }
+        throw cannotBeReadInPlace(url, underlying: nil)
+    }
+
+    private static func cannotBeReadInPlace(_ url: URL, underlying: DabbiError?) -> DabbiError {
+        let hasSharedMemory = FileManager.default.fileExists(atPath: url.path + "-shm")
+        return DabbiError(
+            .readOnlyLocation,
+            "The database cannot be opened in place.",
+            arguments: ["path": url.path],
+            diagnosis: [
+                hasSharedMemory
+                    ? "The store uses write-ahead logging and its -shm file could not be opened."
+                    : "The store uses write-ahead logging and its -shm file is missing. Nothing can read it "
+                        + "without writing next to it, and CoreDataDabbi does not write next to your stores.",
+                "Folder: \(url.deletingLastPathComponent().path)",
+            ],
+            recovery: [
+                hasSharedMemory
+                    ? "Check the permissions of \(url.lastPathComponent)-shm, or open a copy of the store."
+                    : "If the store was copied from somewhere, copy its -wal and -shm files along with it.",
+                "Otherwise open it once with the app that owns it; that recreates the missing files.",
+            ],
+            underlying: underlying
+        )
+    }
+
     private static func explainOpenFailure(_ error: DabbiError, url: URL) -> DabbiError {
         guard error.code == .sqlite, let code = error.arguments["sqliteCode"].flatMap(Int32.init) else { return error }
         switch code & 0xFF {
@@ -234,28 +275,7 @@ public final class SQLiteConnection {
             )
         case SQLITE_CANTOPEN, SQLITE_READONLY:
             guard FileManager.default.fileExists(atPath: url.path) else { return error }
-            // Verified against the system SQLite: a read-only connection never creates the -shm, not even in a
-            // writable folder. A WAL database without one can only be opened through a copy we own.
-            let hasSharedMemory = FileManager.default.fileExists(atPath: url.path + "-shm")
-            return DabbiError(
-                .readOnlyLocation,
-                "The database cannot be opened in place.",
-                arguments: ["path": url.path],
-                diagnosis: [
-                    hasSharedMemory
-                        ? "The store uses write-ahead logging and its -shm file could not be opened."
-                        : "The store uses write-ahead logging and its -shm file is missing. Nothing can read it "
-                            + "without writing next to it, and CoreDataDabbi does not write next to your stores.",
-                    "Folder: \(url.deletingLastPathComponent().path)",
-                ],
-                recovery: [
-                    hasSharedMemory
-                        ? "Check the permissions of \(url.lastPathComponent)-shm, or open a copy of the store."
-                        : "If the store was copied from somewhere, copy its -wal and -shm files along with it.",
-                    "Otherwise open it once with the app that owns it; that recreates the missing files.",
-                ],
-                underlying: error
-            )
+            return cannotBeReadInPlace(url, underlying: error)
         default:
             return error
         }

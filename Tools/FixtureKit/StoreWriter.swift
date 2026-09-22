@@ -137,9 +137,9 @@ struct SeededGenerator: RandomNumberGenerator {
 /// 2024-01-01T00:00:00Z — the epoch all fixture dates are offsets from.
 let fixtureEpoch = Date(timeIntervalSince1970: 1_704_067_200)
 
-enum RawSQLite {
+public enum RawSQLite {
     /// Runs SQL against a database file with a plain read-write connection.
-    static func execute(_ sql: String, at url: URL) throws {
+    public static func execute(_ sql: String, at url: URL) throws {
         var db: OpaquePointer?
         guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK else {
             let message = db.map { String(cString: sqlite3_errmsg($0)) } ?? "out of memory"

@@ -16,6 +16,9 @@ let package = Package(
     products: [
         .library(name: "DabbiKit", targets: ["DabbiKit"]),
         .executable(name: "dabbi", targets: ["dabbi"]),
+        // For the app's hosted tests, which are built by Xcode and can only link products. It depends on none
+        // of the engine, so linking it next to the app duplicates nothing.
+        .library(name: "FixtureKit", targets: ["FixtureKit"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0")
@@ -30,7 +33,7 @@ let package = Package(
         .target(name: "DabbiModel", dependencies: ["DabbiBase", "DabbiSQLite"]),
         .target(name: "DabbiContent", dependencies: ["DabbiBase"]),
         .target(name: "DabbiStore", dependencies: ["DabbiBase", "DabbiModel"]),
-        .target(name: "DabbiQuery", dependencies: ["DabbiStore"]),
+        .target(name: "DabbiQuery", dependencies: ["DabbiModel", "DabbiStore"]),
         .target(name: "DabbiTracking", dependencies: ["DabbiStore", "DabbiSQLite"]),
         .target(name: "DabbiLocator", dependencies: ["DabbiModel", "DabbiSQLite"]),
         .target(name: "DabbiExchange", dependencies: ["DabbiStore", "DabbiQuery"]),
@@ -76,14 +79,35 @@ let package = Package(
             path: "Tools/Writer"
         ),
 
+        // Mutation fuzzing of the content decoders (ARCHITECTURE.md §6.8). The kit is shared with the test suite,
+        // which runs a short, deterministic campaign on every build.
+        .target(name: "ContentFuzzKit", dependencies: ["DabbiContent"], path: "Tools/ContentFuzzKit"),
+        .executableTarget(
+            name: "ContentFuzz",
+            dependencies: [
+                "ContentFuzzKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            path: "Tools/ContentFuzz"
+        ),
+
         // MARK: Tests
 
-        .target(name: "DabbiTestSupport", dependencies: ["FixtureKit"], path: "Tests/DabbiTestSupport"),
+        .target(
+            name: "DabbiTestSupport", dependencies: ["FixtureKit", "DabbiLocator"], path: "Tests/DabbiTestSupport"),
         .testTarget(name: "DabbiBaseTests", dependencies: ["DabbiBase"]),
         .testTarget(name: "DabbiObjCTests", dependencies: ["DabbiObjC"]),
         .testTarget(name: "DabbiSQLiteTests", dependencies: ["DabbiSQLite", "DabbiTestSupport"]),
         .testTarget(name: "DabbiModelTests", dependencies: ["DabbiModel", "DabbiTestSupport"]),
         .testTarget(name: "DabbiStoreTests", dependencies: ["DabbiStore", "DabbiTestSupport"]),
+        .testTarget(name: "DabbiQueryTests", dependencies: ["DabbiQuery", "DabbiTestSupport"]),
+        .testTarget(
+            name: "DabbiTrackingTests",
+            dependencies: ["DabbiTracking", "DabbiStore", "DabbiModel", "DabbiSQLite", "DabbiTestSupport"]),
+        .testTarget(name: "DabbiContentTests", dependencies: ["DabbiContent", "ContentFuzzKit"]),
+        .testTarget(name: "DabbiProjectTests", dependencies: ["DabbiProject"]),
+        .testTarget(name: "DabbiLocatorTests", dependencies: ["DabbiLocator", "DabbiTestSupport"]),
+        .testTarget(name: "DabbiKitTests", dependencies: ["DabbiKit", "DabbiTestSupport"]),
         .testTarget(name: "FixtureKitTests", dependencies: ["FixtureKit", "DabbiTestSupport"]),
     ]
 )

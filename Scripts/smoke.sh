@@ -10,7 +10,12 @@ cd "$(dirname "$0")/.."
 
 fixtures="${1:-Fixtures}"
 swift build --product dabbi >/dev/null
-[ -d "$fixtures" ] || swift run FixtureGen --output "$fixtures" >/dev/null
+# Whatever is missing is generated: Scripts/perf.sh leaves a Fixtures/ with nothing but `large` in it.
+missing=()
+for name in $(swift run FixtureGen --list 2>/dev/null); do
+  [ -f "$fixtures/$name/manifest.json" ] || missing+=(--only "$name")
+done
+[ ${#missing[@]} -eq 0 ] || swift run FixtureGen --output "$fixtures" "${missing[@]}" >/dev/null
 dabbi="$(swift build --show-bin-path)/dabbi"
 
 failures=0

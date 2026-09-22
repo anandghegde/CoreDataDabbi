@@ -1,0 +1,339 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		DA00000000000000000000A1 /* DabbiKit in Frameworks */ = {isa = PBXBuildFile; productRef = DA00000000000000000000A2 /* DabbiKit */; };
+		DA00000000000000000000A4 /* FixtureKit in Frameworks */ = {isa = PBXBuildFile; productRef = DA00000000000000000000A5 /* FixtureKit */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		DA00000000000000000000B1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DA0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA0000000000000000000010;
+			remoteInfo = CoreDataDabbi;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		DA0000000000000000000011 /* CoreDataDabbi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoreDataDabbi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA0000000000000000000021 /* CoreDataDabbiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoreDataDabbiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA0000000000000000000031 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000032 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000033 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000034 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000035 /* Tests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Tests.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DA0000000000000000000041 /* Exceptions for "CoreDataDabbi" folder in "CoreDataDabbi" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DA0000000000000000000010 /* CoreDataDabbi */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		DA0000000000000000000042 /* CoreDataDabbi */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DA0000000000000000000041 /* Exceptions for "CoreDataDabbi" folder in "CoreDataDabbi" target */,
+			);
+			path = CoreDataDabbi;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000043 /* CoreDataDabbiTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CoreDataDabbiTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		DA0000000000000000000013 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA00000000000000000000A1 /* DabbiKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA0000000000000000000023 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA00000000000000000000A4 /* FixtureKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DA0000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000042 /* CoreDataDabbi */,
+				DA0000000000000000000043 /* CoreDataDabbiTests */,
+				DA0000000000000000000003 /* Config */,
+				DA0000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000003 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000031 /* Base.xcconfig */,
+				DA0000000000000000000032 /* Debug.xcconfig */,
+				DA0000000000000000000033 /* Release.xcconfig */,
+				DA0000000000000000000034 /* App.xcconfig */,
+				DA0000000000000000000035 /* Tests.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000011 /* CoreDataDabbi.app */,
+				DA0000000000000000000021 /* CoreDataDabbiTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		DA0000000000000000000010 /* CoreDataDabbi */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA0000000000000000000015 /* Build configuration list for PBXNativeTarget "CoreDataDabbi" */;
+			buildPhases = (
+				DA0000000000000000000012 /* Sources */,
+				DA0000000000000000000013 /* Frameworks */,
+				DA0000000000000000000014 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA0000000000000000000042 /* CoreDataDabbi */,
+			);
+			name = CoreDataDabbi;
+			packageProductDependencies = (
+				DA00000000000000000000A2 /* DabbiKit */,
+			);
+			productName = CoreDataDabbi;
+			productReference = DA0000000000000000000011 /* CoreDataDabbi.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DA0000000000000000000020 /* CoreDataDabbiTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA0000000000000000000025 /* Build configuration list for PBXNativeTarget "CoreDataDabbiTests" */;
+			buildPhases = (
+				DA0000000000000000000022 /* Sources */,
+				DA0000000000000000000023 /* Frameworks */,
+				DA0000000000000000000024 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DA00000000000000000000B2 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				DA0000000000000000000043 /* CoreDataDabbiTests */,
+			);
+			name = CoreDataDabbiTests;
+			packageProductDependencies = (
+				DA00000000000000000000A5 /* FixtureKit */,
+			);
+			productName = CoreDataDabbiTests;
+			productReference = DA0000000000000000000021 /* CoreDataDabbiTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DA0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					DA0000000000000000000010 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					DA0000000000000000000020 = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = DA0000000000000000000010;
+					};
+				};
+			};
+			buildConfigurationList = DA0000000000000000000005 /* Build configuration list for PBXProject "CoreDataDabbi" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = DA0000000000000000000002;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DA00000000000000000000A3 /* XCLocalSwiftPackageReference ".." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = DA0000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DA0000000000000000000010 /* CoreDataDabbi */,
+				DA0000000000000000000020 /* CoreDataDabbiTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DA0000000000000000000014 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA0000000000000000000024 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		DA0000000000000000000012 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA0000000000000000000022 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DA00000000000000000000B2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA0000000000000000000010 /* CoreDataDabbi */;
+			targetProxy = DA00000000000000000000B1 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		DA0000000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000032 /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		DA0000000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000033 /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		DA0000000000000000000016 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000034 /* App.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		DA0000000000000000000017 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000034 /* App.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		DA0000000000000000000026 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000035 /* Tests.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		DA0000000000000000000027 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000035 /* Tests.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		DA0000000000000000000005 /* Build configuration list for PBXProject "CoreDataDabbi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA0000000000000000000006 /* Debug */,
+				DA0000000000000000000007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA0000000000000000000015 /* Build configuration list for PBXNativeTarget "CoreDataDabbi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA0000000000000000000016 /* Debug */,
+				DA0000000000000000000017 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA0000000000000000000025 /* Build configuration list for PBXNativeTarget "CoreDataDabbiTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA0000000000000000000026 /* Debug */,
+				DA0000000000000000000027 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		DA00000000000000000000A3 /* XCLocalSwiftPackageReference ".." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		DA00000000000000000000A2 /* DabbiKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DabbiKit;
+		};
+		DA00000000000000000000A5 /* FixtureKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FixtureKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = DA0000000000000000000001 /* Project object */;
+}

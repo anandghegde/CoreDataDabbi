@@ -47,7 +47,9 @@ public enum PredicateGuard {
 
     static let allowedCastTypes: Set<String> = ["NSDate", "NSNumber", "NSDecimalNumber", "NSString"]
 
-    static func check(_ predicate: NSPredicate) throws {
+    /// Refuses a predicate that was *built* rather than parsed — out of an AST by `DabbiQuery`, or out of a
+    /// project file somebody edited by hand — before it is executed.
+    public static func check(_ predicate: NSPredicate) throws {
         switch predicate {
         case let compound as NSCompoundPredicate:
             for case let sub as NSPredicate in compound.subpredicates { try check(sub) }
@@ -67,7 +69,7 @@ public enum PredicateGuard {
         }
     }
 
-    static func check(_ expression: NSExpression) throws {
+    public static func check(_ expression: NSExpression) throws {
         switch expression.expressionType {
         case .constantValue, .evaluatedObject, .variable, .keyPath, .anyKey:
             return

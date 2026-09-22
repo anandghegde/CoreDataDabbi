@@ -1,0 +1,1168 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
+    "%@ points at nothing else." : {
+
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %lld fields" : {
+      "comment" : "An update and how many fields",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld fields"
+          }
+        }
+      }
+    },
+    "%@ · nothing in the reading changed" : {
+      "comment" : "A row saved over with the values it already had"
+    },
+    "%@ · prior value unknown" : {
+      "comment" : "An update with no before-values"
+    },
+    "%@ — not run; the bytes are shown as they are" : {
+
+    },
+    "%@ — playback comes later." : {
+
+    },
+    "%@ — there is nothing to decode." : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "%@, not where it was" : {
+
+    },
+    "%@, unchanged" : {
+
+    },
+    "%@.%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@.%2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%lld added" : {
+      "comment" : "Links gained"
+    },
+    "%lld apps installed" : {
+
+    },
+    "%lld bytes" : {
+
+    },
+    "%lld commits" : {
+      "comment" : "Commits a single tracking batch stood for"
+    },
+    "%lld created, %lld updated, %lld deleted" : {
+      "comment" : "Tracking log totals",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld created, %2$lld updated, %3$lld deleted"
+          }
+        }
+      }
+    },
+    "%lld items" : {
+
+    },
+    "%lld moved" : {
+
+    },
+    "%lld objects" : {
+      "comment" : "Number of objects in a relationship"
+    },
+    "%lld of its own, %lld with its subentities" : {
+      "comment" : "Tooltip on the row count of an entity that has subentities",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of its own, %2$lld with its subentities"
+          }
+        }
+      }
+    },
+    "%lld older objects dropped from the log" : {
+
+    },
+    "%lld removed" : {
+
+    },
+    "%lld rows" : {
+
+    },
+    "%lld stores" : {
+
+    },
+    "%lld versions" : {
+
+    },
+    "1 app installed" : {
+
+    },
+    "1 store" : {
+
+    },
+    "A .dabbi project saved earlier" : {
+
+    },
+    "A cached model can lack the app's fetch request templates." : {
+
+    },
+    "A container was too large to search to the end; some stores may be missing." : {
+
+    },
+    "About %@" : {
+
+    },
+    "Abstract" : {
+
+    },
+    "Abstract — its rows are its subentities'" : {
+
+    },
+    "An empty string, not nil" : {
+
+    },
+    "Any Core Data or SwiftData store file" : {
+
+    },
+    "App bundle model" : {
+
+    },
+    "App groups no installed app claims" : {
+
+    },
+    "Attributes" : {
+
+    },
+    "Back" : {
+
+    },
+    "Back/Forward" : {
+
+    },
+    "Binary property list" : {
+
+    },
+    "Booted" : {
+
+    },
+    "Booted Only" : {
+
+    },
+    "Bring All to Front" : {
+
+    },
+    "Browse Simulators" : {
+
+    },
+    "Browse Simulators…" : {
+
+    },
+    "Cached model" : {
+
+    },
+    "Cascade" : {
+
+    },
+    "Change" : {
+      "comment" : "Tracking log column: what happened to a row"
+    },
+    "Change log" : {
+      "comment" : "The tracking table"
+    },
+    "Changes could not be tracked." : {
+
+    },
+    "Choose" : {
+
+    },
+    "Choose Store…" : {
+
+    },
+    "Choose a Core Data or SwiftData store." : {
+
+    },
+    "Choose a relationship" : {
+
+    },
+    "Choose an entity in the sidebar." : {
+
+    },
+    "Class" : {
+
+    },
+    "Clear Filter" : {
+
+    },
+    "Clear Log" : {
+
+    },
+    "Clear Menu" : {
+
+    },
+    "Clear the filter" : {
+
+    },
+    "Click a cell in the grid to see what it holds." : {
+
+    },
+    "Close" : {
+
+    },
+    "Collapse" : {
+
+    },
+    "Columns (%lld)" : {
+
+    },
+    "Composite type" : {
+
+    },
+    "Content" : {
+
+    },
+    "Content mode" : {
+
+    },
+    "Copy" : {
+
+    },
+    "Copy Again" : {
+
+    },
+    "Copy Object ID URI" : {
+
+    },
+    "Copy Path" : {
+
+    },
+    "Copy SQL" : {
+
+    },
+    "Copy the SQL for this table and its indexes" : {
+
+    },
+    "Copy what is shown" : {
+
+    },
+    "Core Data timestamp: %@" : {
+
+    },
+    "Count" : {
+
+    },
+    "Created" : {
+      "comment" : "A row the watched app inserted"
+    },
+    "Customize Toolbar…" : {
+
+    },
+    "Cut" : {
+
+    },
+    "Data" : {
+
+    },
+    "Data container" : {
+
+    },
+    "Decode as" : {
+
+    },
+    "Decode as another kind of content" : {
+
+    },
+    "Default" : {
+
+    },
+    "Delete rule" : {
+
+    },
+    "Deleted" : {
+
+    },
+    "Deleted while it was being read" : {
+
+    },
+    "Deny" : {
+
+    },
+    "Derived from" : {
+
+    },
+    "Destination" : {
+
+    },
+    "Details" : {
+
+    },
+    "Detect Automatically" : {
+
+    },
+    "Device" : {
+
+    },
+    "Device, app or store" : {
+
+    },
+    "Drop a store, an app bundle or an .xcappdata container here." : {
+
+    },
+    "Duplicate" : {
+
+    },
+    "Edit" : {
+
+    },
+    "Editable" : {
+
+    },
+    "Elements" : {
+
+    },
+    "Empty text, not nil" : {
+
+    },
+    "Enter Full Screen" : {
+
+    },
+    "Entities" : {
+
+    },
+    "Entity" : {
+
+    },
+    "Expand" : {
+
+    },
+    "External storage" : {
+
+    },
+    "Fetch Requests" : {
+
+    },
+    "Fetched properties" : {
+
+    },
+    "Field content" : {
+
+    },
+    "File" : {
+
+    },
+    "Filter" : {
+
+    },
+    "Filter Rows" : {
+
+    },
+    "Filter rows — age > 30 AND name BEGINSWITH[cd] \"a\"" : {
+      "comment" : "Placeholder of the predicate field, with an example predicate"
+    },
+    "First %lld rows" : {
+      "comment" : "Row count cut short by the fetch limit"
+    },
+    "Focus" : {
+
+    },
+    "Forward" : {
+
+    },
+    "From %@" : {
+
+    },
+    "Go" : {
+
+    },
+    "Go back to %@" : {
+
+    },
+    "Has constraints" : {
+
+    },
+    "Help" : {
+
+    },
+    "Hex" : {
+
+    },
+    "Hide %@" : {
+
+    },
+    "Hide Bottom Panel" : {
+
+    },
+    "Hide Others" : {
+
+    },
+    "Hide earlier versions" : {
+
+    },
+    "Indexes" : {
+
+    },
+    "Indexes (%lld)" : {
+
+    },
+    "Inherits from" : {
+
+    },
+    "Inspector" : {
+
+    },
+    "Inspector tab" : {
+
+    },
+    "Install a simulator runtime in Xcode, or open a store file instead." : {
+
+    },
+    "Inverse" : {
+
+    },
+    "Join tables" : {
+
+    },
+    "Kept in history" : {
+
+    },
+    "Keyed archive" : {
+
+    },
+    "Kind" : {
+
+    },
+    "Large values are kept in files beside the store" : {
+
+    },
+    "Last change: %lld ms from save to screen" : {
+      "comment" : "Tracking latency in the footer tooltip"
+    },
+    "Length" : {
+
+    },
+    "Link" : {
+
+    },
+    "Load More" : {
+
+    },
+    "Log what the app writes to this store" : {
+
+    },
+    "Look at every simulator again" : {
+
+    },
+    "Looking for simulators…" : {
+
+    },
+    "Looking for stores in what you dropped…" : {
+
+    },
+    "Looking inside %@…" : {
+
+    },
+    "Looking…" : {
+
+    },
+    "Looks like %@" : {
+
+    },
+    "Maximum" : {
+
+    },
+    "Maximum length" : {
+
+    },
+    "May be stored outside the database" : {
+
+    },
+    "Minimize" : {
+
+    },
+    "Minimum" : {
+
+    },
+    "Minimum length" : {
+
+    },
+    "Model file" : {
+
+    },
+    "Move To…" : {
+
+    },
+    "No" : {
+
+    },
+    "No Store" : {
+
+    },
+    "No action" : {
+
+    },
+    "No apps installed" : {
+
+    },
+    "No changes yet" : {
+
+    },
+    "No device matches" : {
+
+    },
+    "No entity selected" : {
+
+    },
+    "No field selected" : {
+
+    },
+    "No object" : {
+      "comment" : "Spoken for an empty to-one relationship"
+    },
+    "No objects" : {
+
+    },
+    "No relationships" : {
+
+    },
+    "No row selected" : {
+
+    },
+    "No simulators" : {
+
+    },
+    "No stores" : {
+
+    },
+    "No value" : {
+      "comment" : "Spoken for a NULL column"
+    },
+    "None" : {
+
+    },
+    "None of this device's apps has a Core Data or SwiftData store the filters allow." : {
+
+    },
+    "Not known" : {
+      "comment" : "Spoken for a tracking cell whose value was never read"
+    },
+    "Not looked at yet" : {
+
+    },
+    "Not open" : {
+
+    },
+    "Not read yet" : {
+      "comment" : "Spoken for a grid cell whose page has not arrived"
+    },
+    "Not where it was" : {
+
+    },
+    "Nothing on the other side" : {
+
+    },
+    "Nothing yet" : {
+
+    },
+    "Nullify" : {
+
+    },
+    "Object ID" : {
+
+    },
+    "On deletion" : {
+
+    },
+    "Open" : {
+
+    },
+    "Open Database" : {
+
+    },
+    "Open Database…" : {
+
+    },
+    "Open Project" : {
+
+    },
+    "Open Recent" : {
+
+    },
+    "Open a Core Data or SwiftData store file, or pick an app from a simulator." : {
+
+    },
+    "Open in Browser" : {
+
+    },
+    "Open this store in a new project" : {
+
+    },
+    "Opening %@…" : {
+
+    },
+    "Opening…" : {
+
+    },
+    "Opens it" : {
+
+    },
+    "Open…" : {
+
+    },
+    "Optional" : {
+
+    },
+    "Options" : {
+
+    },
+    "Ordered" : {
+
+    },
+    "Paste" : {
+
+    },
+    "Pattern" : {
+
+    },
+    "Pause Tracking" : {
+
+    },
+    "Paused" : {
+
+    },
+    "Pick an app's store from a simulator" : {
+
+    },
+    "Quit %@" : {
+
+    },
+    "Range" : {
+
+    },
+    "Read from the simulator folders; simctl could not be asked." : {
+
+    },
+    "Read with the model cached in the store." : {
+
+    },
+    "Read-only" : {
+
+    },
+    "Reading %@…" : {
+      "comment" : "Tracking is establishing a baseline"
+    },
+    "Reading a copy made at %@." : {
+
+    },
+    "Reading a copy of the store, made at %@" : {
+
+    },
+    "Reading…" : {
+
+    },
+    "Recents" : {
+
+    },
+    "Redo" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Related objects" : {
+
+    },
+    "Relationship" : {
+
+    },
+    "Relationships" : {
+
+    },
+    "Reload Store" : {
+
+    },
+    "Rename…" : {
+
+    },
+    "Renaming ID" : {
+
+    },
+    "Rendered" : {
+
+    },
+    "Resume Tracking" : {
+
+    },
+    "Reveal" : {
+
+    },
+    "Reveal in Entity" : {
+
+    },
+    "Revert To Saved" : {
+
+    },
+    "Rows" : {
+
+    },
+    "Run an app on this simulator, and its stores will show up here." : {
+
+    },
+    "Runtime not installed" : {
+
+    },
+    "SHA-256 %@" : {
+
+    },
+    "SQL" : {
+
+    },
+    "SQLite" : {
+
+    },
+    "Save…" : {
+
+    },
+    "Secure unarchiving (the default)" : {
+
+    },
+    "Select All" : {
+
+    },
+    "Select a row in the grid to see everything it holds." : {
+
+    },
+    "Select a row in the grid to see what it is joined to." : {
+
+    },
+    "Select a simulator" : {
+
+    },
+    "Services" : {
+
+    },
+    "Shared App Groups" : {
+
+    },
+    "Shared with everything that inherits from the same root entity." : {
+
+    },
+    "Show All" : {
+
+    },
+    "Show All Columns" : {
+
+    },
+    "Show Bottom Panel" : {
+
+    },
+    "Show Inspector" : {
+
+    },
+    "Show Other Databases" : {
+
+    },
+    "Show Rows" : {
+      "comment" : "Leaves the change log for the grid"
+    },
+    "Show Sidebar" : {
+
+    },
+    "Show Store in Finder" : {
+
+    },
+    "Show Toolbar" : {
+
+    },
+    "Show earlier versions" : {
+
+    },
+    "Show in Finder" : {
+
+    },
+    "Show only simulators that are running" : {
+
+    },
+    "Show the next place" : {
+
+    },
+    "Show the previous place" : {
+
+    },
+    "Show this object in the main grid" : {
+
+    },
+    "Show this window when CoreDataDabbi opens" : {
+
+    },
+    "Shown as source. Rendering HTML will come with a per-project choice." : {
+
+    },
+    "Simulators" : {
+
+    },
+    "Size All Columns to Fit" : {
+
+    },
+    "Some changes cannot be tracked exactly" : {
+      "comment" : "Footer warning for reduced-fidelity tracking"
+    },
+    "Stop Tracking" : {
+
+    },
+    "Stop logging what the app writes" : {
+
+    },
+    "Stopped" : {
+
+    },
+    "Store" : {
+
+    },
+    "Stored with" : {
+
+    },
+    "Stores and projects you open will be listed here." : {
+
+    },
+    "Structure" : {
+
+    },
+    "Subentities" : {
+
+    },
+    "SwiftData" : {
+
+    },
+    "Text" : {
+
+    },
+    "The PDF could not be read." : {
+
+    },
+    "The field could not be read." : {
+
+    },
+    "The field holds no bytes." : {
+
+    },
+    "The field is null." : {
+
+    },
+    "The first %lld are listed." : {
+
+    },
+    "The image could not be read." : {
+
+    },
+    "The image this field holds" : {
+
+    },
+    "The relationship could not be read." : {
+
+    },
+    "The rich text could not be read." : {
+
+    },
+    "The row could not be read." : {
+
+    },
+    "The rows could not be read." : {
+
+    },
+    "The store file was replaced — reopening" : {
+      "comment" : "Shown when the watched app reinstalled or restored its store"
+    },
+    "The table could not be read." : {
+
+    },
+    "There is no text in these bytes." : {
+
+    },
+    "This Mac" : {
+
+    },
+    "This object's “%@” is empty." : {
+
+    },
+    "This project has no store yet" : {
+
+    },
+    "This row has no such property." : {
+
+    },
+    "To-many" : {
+
+    },
+    "To-many → %@" : {
+
+    },
+    "To-one" : {
+
+    },
+    "To-one → %@" : {
+
+    },
+    "Track Changes" : {
+
+    },
+    "Tracking %@" : {
+
+    },
+    "Trail" : {
+
+    },
+    "Transformer" : {
+
+    },
+    "Transient" : {
+
+    },
+    "Try Again" : {
+
+    },
+    "Type" : {
+
+    },
+    "UNIQUE" : {
+
+    },
+    "Undo" : {
+
+    },
+    "Uniqueness constraints" : {
+
+    },
+    "Unknown App" : {
+
+    },
+    "Updated" : {
+
+    },
+    "User info" : {
+
+    },
+    "Validation" : {
+
+    },
+    "Value class" : {
+
+    },
+    "Version %@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Version hash" : {
+
+    },
+    "Version hash modifier" : {
+
+    },
+    "View" : {
+
+    },
+    "Welcome to CoreDataDabbi" : {
+
+    },
+    "What the browser lists" : {
+
+    },
+    "What was found" : {
+
+    },
+    "What you can do" : {
+
+    },
+    "When" : {
+      "comment" : "Tracking log column: when the change was noticed"
+    },
+    "Window" : {
+
+    },
+    "Working Copy" : {
+
+    },
+    "XML property list" : {
+
+    },
+    "Yes" : {
+
+    },
+    "Yes — its rows are its subentities'" : {
+
+    },
+    "Yes — not stored" : {
+
+    },
+    "Yes — not stored, and not shown in the grid" : {
+
+    },
+    "Zoom" : {
+
+    },
+    "a relationship's join table could not be confirmed" : {
+
+    },
+    "array" : {
+
+    },
+    "changed to %@" : {
+      "comment" : "Spoken for a changed field"
+    },
+    "default %@" : {
+
+    },
+    "deleted" : {
+      "comment" : "Placeholder for a row that was removed while being read"
+    },
+    "derived" : {
+
+    },
+    "dictionary" : {
+
+    },
+    "empty" : {
+      "comment" : "Shown for a stored zero-length string"
+    },
+    "entered the filter" : {
+      "comment" : "A row that now matches the saved filter"
+    },
+    "false" : {
+
+    },
+    "it has no save counter, so updates cannot be told apart; inserts and deletes are exact" : {
+
+    },
+    "its rows cannot be attributed to an entity" : {
+
+    },
+    "its table could not be confirmed, so it is not watched" : {
+
+    },
+    "its table is not in this database" : {
+
+    },
+    "left the filter" : {
+
+    },
+    "nil" : {
+
+    },
+    "no inverse" : {
+
+    },
+    "none" : {
+      "comment" : "An empty to-many relationship"
+    },
+    "not null" : {
+
+    },
+    "older versions dropped" : {
+
+    },
+    "optional" : {
+
+    },
+    "ordered" : {
+
+    },
+    "primary key" : {
+
+    },
+    "runtime not installed" : {
+
+    },
+    "set" : {
+
+    },
+    "some rows belong to an entity this model does not describe" : {
+
+    },
+    "transient" : {
+
+    },
+    "true" : {
+
+    },
+    "unlimited" : {
+
+    },
+    "untyped" : {
+
+    },
+    "—" : {
+
+    },
+    "… %lld more characters not shown." : {
+
+    }
+  },
+  "version" : "1.0"
+}

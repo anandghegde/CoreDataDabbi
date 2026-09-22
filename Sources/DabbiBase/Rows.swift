@@ -29,17 +29,41 @@ public struct RowPage: Sendable, Hashable, Codable {
     /// Positions within the pager's ID list. May be shorter than the requested range at the end of the list.
     public let range: Range<Int>
     /// Rows in pager order. A row deleted since the pager was opened is absent, so `rows.count` can be less
-    /// than `range.count`.
+    /// than `range.count`; `missing` says which.
     public let rows: [RowSnapshot]
+    /// The columns the rows carry: the pager's, or the subset the page was asked for.
     public let columns: ColumnSet
     /// The session generation the page belongs to. Pages from an older generation must be dropped.
     public let generation: Int
+    /// Positions in `range`, ascending, whose objects no longer exist. Almost always empty.
+    public let missing: [Int]
 
-    public init(range: Range<Int>, rows: [RowSnapshot], columns: ColumnSet, generation: Int) {
+    public init(range: Range<Int>, rows: [RowSnapshot], columns: ColumnSet, generation: Int, missing: [Int] = []) {
         self.range = range
         self.rows = rows
         self.columns = columns
         self.generation = generation
+        self.missing = missing
+    }
+
+    /// The row at `position` of the pager's list; `nil` outside `range` and for a deleted row.
+    public func row(at position: Int) -> RowSnapshot? {
+        guard range.contains(position) else { return nil }
+        var index = position - range.lowerBound
+        for gap in missing {
+            if gap == position { return nil }
+            if gap > position { break }
+            index -= 1
+        }
+        return rows.indices.contains(index) ? rows[index] : nil
+    }
+
+    /// One element per position of `range`; `nil` where the row is gone.
+    public var rowsByPosition: [RowSnapshot?] {
+        guard !missing.isEmpty else { return rows }
+        var remaining = rows[...]
+        let gaps = Set(missing)
+        return range.map { gaps.contains($0) ? nil : remaining.popFirst() }
     }
 }
 

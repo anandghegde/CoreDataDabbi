@@ -55,7 +55,11 @@ private func rows(_ session: StoreSession, _ spec: FetchSpec, by key: String) as
         func fingerprint() throws -> [String: Data] {
             var files: [String: Data] = [:]
             for name in try FileManager.default.contentsOfDirectory(atPath: location.directory.path) {
-                files[name] = try Data(contentsOf: location.directory.appendingPathComponent(name))
+                // The -shm is the shared memory of everyone who has the database open, readers included: the
+                // first of them rebuilds the index in it. That it exists is compared; what is in it is not.
+                files[name] =
+                    name.hasSuffix("-shm")
+                    ? Data() : try Data(contentsOf: location.directory.appendingPathComponent(name))
             }
             return files
         }
@@ -283,6 +287,32 @@ private func rows(_ session: StoreSession, _ spec: FetchSpec, by key: String) as
         }
         #expect(sorted.count == 10 && cities.count == 8)
         #expect(cities == cities.sorted())
+        await session.close()
+    }
+
+    /// PRJ-11: what SwiftData makes of `@Model` classes is an ordinary Core Data schema, read through the model
+    /// the store caches — there is no other to be had.
+    @Test func aSwiftDataStoreReadsLikeAnyOther() async throws {
+        let session = try await open(.swiftData)
+        #expect(session.info.modelSource == .storeCache)
+        let trips = try await rows(session, FetchSpec(entity: "Trip"), by: "name")
+        let trip = try #require(trips["Trip 0"])
+        #expect(trip["notes"] == .string("Booked through the office.") && trips["Trip 1"]?["notes"] == .null)
+        // A Codable enum is a composite of one attribute; a Codable struct one of its properties.
+        #expect(trip["kind"] == .composite(["kind": .string("business")]))
+        // `[String]` is a transformable: a keyed archive, never unarchived.
+        guard case .blob(let tags) = trip["tags"] else {
+            Issue.record("tags is \(String(describing: trip["tags"]))")
+            return
+        }
+        #expect(tags.sniffedType == .binaryPlist)
+
+        let stops = try await rows(session, FetchSpec(entity: "Stop"), by: "city")
+        #expect(stops["City 1.1"]?["position"] == .composite(["latitude": .double(49), "longitude": .double(12)]))
+        #expect(stops["City 1.1"]?["nights"] == .int(2))
+        #expect(
+            try await session.count(
+                FetchSpec(entity: "Stop", predicate: PredicateSource(format: "trip.name == 'Trip 2'"))) == 2)
         await session.close()
     }
 

@@ -27,7 +27,9 @@ public struct FetchSpec: Sendable, Hashable, Codable {
 
 /// A predicate as the user wrote it.
 ///
-/// The parsed AST joins this type with the query engine (M2-01); until then the format string is authoritative.
+/// Text stays the stored form everywhere — in a `FetchSpec`, in a saved predicate, in a project file — because
+/// it is readable, diffable and survives a version of the app whose AST has moved on. `DabbiQuery` turns it into
+/// a `PredicateAST` (`PredicateSource.ast()`) for the builder and the validator, and back again.
 public struct PredicateSource: Sendable, Hashable, Codable {
     /// An `NSPredicate` format string with no substitution arguments, e.g. `age > 30 AND name BEGINSWITH[cd] "a"`.
     public var format: String

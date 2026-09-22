@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PATHS=(Package.swift Sources Tests Tools)
+PATHS=(Package.swift Sources Tests Tools App)
 if [[ "${1:-}" == "--fix" ]]; then
     swift format format --in-place --recursive --parallel "${PATHS[@]}"
 else

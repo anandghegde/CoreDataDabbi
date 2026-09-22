@@ -1,0 +1,8 @@
+// The unit tests, hosted by the app.
+
+PRODUCT_NAME = CoreDataDabbiTests
+PRODUCT_BUNDLE_IDENTIFIER = org.coredatadabbi.CoreDataDabbiTests
+GENERATE_INFOPLIST_FILE = YES
+BUNDLE_LOADER = $(TEST_HOST)
+TEST_HOST = $(BUILT_PRODUCTS_DIR)/CoreDataDabbi.app/Contents/MacOS/CoreDataDabbi
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/../Frameworks @loader_path/../Frameworks

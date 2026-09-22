@@ -2,11 +2,6 @@ import DabbiBase
 import DabbiModel
 import Foundation
 
-/// How a store is opened. Only read-only exists so far; editable arrives with staged edits (M3).
-public enum AccessMode: String, Sendable, Hashable, Codable {
-    case readOnly
-}
-
 /// Everything a front end shows about an open store that is not row data.
 public struct StoreInfo: Sendable, Hashable, Codable {
     public let url: URL
@@ -32,8 +27,10 @@ public struct EntityCount: Sendable, Hashable, Codable {
 public struct PagerHandle: Sendable, Hashable, Codable {
     public let id: UUID
     public let spec: FetchSpec
-    /// The number of objects in the list when it was opened.
+    /// The number of objects in the list when this handle was made. `loadMore` returns a handle with more.
     public let count: Int
+    /// The spec's fetch limit cut the list short: `StoreSession.loadMore` has more rows to add (BRW-11).
+    public let hasMore: Bool
     /// What `page` returns for this pager: the entity's stored properties, then those its descendants add.
     public let columns: ColumnSet
     /// The session generation the pager belongs to. A pager from an older generation is stale.

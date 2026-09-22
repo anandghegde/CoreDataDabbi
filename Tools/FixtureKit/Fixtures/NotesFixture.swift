@@ -19,11 +19,30 @@ public enum NotesFixture {
 
     public static var historyOptions: [String: Any] { [NSPersistentHistoryTrackingKey: true] }
 
-    /// Five transactions by two authors: inserts, updates and a delete.
+    /// The same shape, with two of `Note`'s attributes marked to survive the row being deleted.
+    ///
+    /// A separate model rather than a flag on `makeModel()`: the preservation flag is part of an entity's version
+    /// hash, and the other fixtures built from the Notes model are about other things.
+    public static func makeHistoryModel() -> NSManagedObjectModel {
+        let folder = entity("Folder", [attribute("name", .stringAttributeType)])
+        let note = entity(
+            "Note",
+            [
+                attribute("title", .stringAttributeType, preserved: true),
+                attribute("body", .stringAttributeType),
+                attribute("pinned", .booleanAttributeType, defaultValue: false),
+                attribute("modifiedAt", .dateAttributeType, preserved: true),
+            ])
+        relate(folder, "notes", .toMany, note, inverse: "folder", .toOne, deleteRule: .cascadeDeleteRule)
+        return model([folder, note], identifier: "notes-history-1")
+    }
+
+    /// Five transactions by two authors: inserts, updates and a delete, with tombstones on the delete.
     static func buildHistory(in directory: URL) throws -> FixtureManifest {
         let writer = try StoreWriter(
-            model: makeModel(), storeURL: directory.appendingPathComponent("History.sqlite"),
+            model: makeHistoryModel(), storeURL: directory.appendingPathComponent("History.sqlite"),
             options: historyOptions)
+        writer.context.name = "fixture-writer"
 
         var folders: [NSManagedObject] = []
         var notes: [NSManagedObject] = []
@@ -56,7 +75,10 @@ public enum NotesFixture {
 
         return FixtureManifest(
             fixture: .history,
-            summary: "Persistent history tracking on; five transactions by the authors app and sync.",
+            summary: """
+                Persistent history tracking on; five transactions by the authors app and sync, \
+                with two of Note's attributes preserved in history on deletion.
+                """,
             store: "History.sqlite",
             entityCounts: ["Folder": 2, "Note": 10]
         )

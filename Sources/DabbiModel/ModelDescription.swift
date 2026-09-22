@@ -81,6 +81,19 @@ public struct EntityDescription: Sendable, Hashable, Codable {
 
     /// Attribute names followed by relationship names: the default column order of a grid.
     public var propertyNames: [String] { attributes.map(\.name) + relationships.map(\.name) }
+
+    /// Attribute names tried first, in order, as the label of an object of this entity (BRW-2, REL-1).
+    public static let displayNameCandidates = ["name", "title", "label", "identifier"]
+
+    /// The attribute that labels an object of this entity wherever there is no room for all of it — a to-one in
+    /// the grid, a related object in the relationships panel: the first of the conventional names the entity
+    /// has, or failing that its first string attribute.
+    ///
+    /// A project can override the choice per entity (`EntityLayout.displayAttribute`); this is what it overrides.
+    public var displayAttributeName: String? {
+        let strings = attributes.filter { $0.type == .string && !$0.isTransient }.map(\.name)
+        return Self.displayNameCandidates.first(where: strings.contains) ?? strings.first
+    }
 }
 
 public enum AttributeType: String, Sendable, Hashable, Codable, CaseIterable {

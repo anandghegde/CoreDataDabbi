@@ -13,9 +13,6 @@ struct ValueConverter: Sendable {
         var displayAttribute: String?
     }
 
-    /// Attribute names tried first, in order, as the label of a to-one's destination (BRW-2).
-    static let displayNameCandidates = ["name", "title", "label", "identifier"]
-
     let model: ModelDescription
     private let layouts: [String: Layout]
 
@@ -26,9 +23,7 @@ struct ValueConverter: Sendable {
             var layout = Layout()
             for attribute in entity.attributes { layout.attributes[attribute.name] = attribute }
             for relationship in entity.relationships { layout.relationships[relationship.name] = relationship }
-            let strings = entity.attributes.filter { $0.type == .string && !$0.isTransient }.map(\.name)
-            layout.displayAttribute =
-                Self.displayNameCandidates.first(where: strings.contains) ?? strings.first
+            layout.displayAttribute = entity.displayAttributeName
             layouts[entity.name] = layout
         }
         self.layouts = layouts
@@ -56,6 +51,26 @@ struct ValueConverter: Sendable {
     func toOneRelationships(in columns: ColumnSet, of entity: String) -> [String] {
         guard let layout = layouts[entity] else { return [] }
         return columns.properties.filter { layout.relationships[$0]?.isToMany == false }
+    }
+
+    /// What to name in `propertiesToFetch` to read only `columns`: their attributes and to-ones. `nil` when a
+    /// partial fetch cannot serve them — a column only a sub-entity has cannot be named on the parent's request,
+    /// and would cost one fault per row instead.
+    func partialFetchProperties(for columns: ColumnSet, of entity: String) -> [String]? {
+        guard let layout = layouts[entity] else { return nil }
+        var properties: [String] = []
+        for name in columns.properties {
+            if let attribute = layout.attributes[name] {
+                // A composite is several columns under one name; leave those to the full fetch.
+                guard attribute.type != .composite else { return nil }
+                properties.append(name)
+            } else if let relationship = layout.relationships[name] {
+                if !relationship.isToMany { properties.append(name) }
+            } else {
+                return nil
+            }
+        }
+        return properties
     }
 
     /// The to-many relationships among `columns` that can be counted for a whole page in one grouped fetch:
@@ -93,6 +108,17 @@ struct ValueConverter: Sendable {
             return toMany(object.value(forKey: name))
         }
         return RowSnapshot(ref: ref, values: values)
+    }
+
+    /// One object as the relationships panel lists it: its identity, and the label a to-one would carry (REL-1).
+    ///
+    /// Reading the identity does not fire the object's fault; reading the label does, which is why this is
+    /// only ever called for the objects actually shown.
+    func item(of object: NSManagedObject) -> RelatedObjects.Item? {
+        guard let ref = ObjectRef(uri: object.objectID.uriRepresentation()) else { return nil }
+        let display = object.entity.name.flatMap { layouts[$0]?.displayAttribute }
+            .flatMap { object.value(forKey: $0) as? String }
+        return RelatedObjects.Item(ref: ref, display: display.flatMap { $0.isEmpty ? nil : $0 })
     }
 
     private func toOne(_ raw: Any?) -> Value {

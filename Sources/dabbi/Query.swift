@@ -53,6 +53,9 @@ struct Query: AsyncParsableCommand {
         windowed.limit = offset + limit
 
         try await withSession(options) { session in
+            if let predicate {
+                try report(PredicateValidator(model: session.info.model).validate(predicate, entity: entity))
+            }
             let pager = try await session.openPager(windowed)
             let page = try await session.page(pager, range: offset..<(offset + limit))
             let total = try await session.count(matching)
@@ -74,5 +77,16 @@ struct Query: AsyncParsableCommand {
                 ? "no rows" : "rows \(page.range.lowerBound + 1)–\(page.range.lowerBound + page.rows.count)"
             print("\n\(shown) of \(total) matching")
         }
+    }
+
+    /// Checks the predicate against the model before the fetch, so a mistyped key path is a sentence on stderr
+    /// rather than an exception from inside Core Data (M2-01). Warnings are printed and the fetch goes ahead.
+    private func report(_ validation: PredicateValidation) throws {
+        for diagnostic in validation.diagnostics {
+            var lines = ["\(diagnostic.severity.rawValue): \(diagnostic.message)"]
+            lines += diagnostic.suggestions.map { "  → \($0)" }
+            FileHandle.standardError.write(Data((lines.joined(separator: "\n") + "\n").utf8))
+        }
+        guard validation.isValid else { throw ExitCode.failure }
     }
 }

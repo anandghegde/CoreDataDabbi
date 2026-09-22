@@ -28,6 +28,7 @@ func attribute(
     defaultValue: Any? = nil,
     transformer: String? = nil,
     externalStorage: Bool = false,
+    preserved: Bool = false,
     validation: [String] = [],
     userInfo: [String: String] = [:]
 ) -> NSAttributeDescription {
@@ -37,6 +38,8 @@ func attribute(
     attribute.isOptional = optional
     attribute.defaultValue = defaultValue
     attribute.allowsExternalBinaryDataStorage = externalStorage
+    // What persistent history keeps of the value after the row is deleted — the only prior value a tombstone has.
+    attribute.preservesValueInHistoryOnDeletion = preserved
     if type == .transformableAttributeType { attribute.valueTransformerName = transformer }
     if !validation.isEmpty {
         attribute.setValidationPredicates(

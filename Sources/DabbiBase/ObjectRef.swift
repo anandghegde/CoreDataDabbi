@@ -42,3 +42,20 @@ extension ObjectRef: Comparable {
         (lhs.entity, lhs.pk) < (rhs.entity, rhs.pk)
     }
 }
+
+extension ObjectRef {
+    /// Mints the reference of a row of a known store from its entity and its primary key.
+    ///
+    /// The tracker's scan reads `Z_PK` and `Z_ENT` and never opens Core Data, so what it reports is a key and an
+    /// entity name (`RowID`). This is how such a key becomes an identity the rest of the engine can fetch: the URI
+    /// is Core Data's own form, so the coordinator of the store whose UUID is given resolves it to an object ID.
+    ///
+    /// Returns `nil` when the parts cannot make one — an empty UUID or entity, a key Core Data would never hand
+    /// out (they start at 1), or a name that is not allowed in a URL.
+    public init?(storeUUID: String, entity: String, pk: Int64) {
+        guard !storeUUID.isEmpty, !entity.isEmpty, pk > 0,
+            let uri = URL(string: "x-coredata://\(storeUUID)/\(entity)/p\(pk)")
+        else { return nil }
+        self.init(entity: entity, pk: pk, uri: uri)
+    }
+}

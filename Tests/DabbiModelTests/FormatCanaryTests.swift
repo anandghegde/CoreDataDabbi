@@ -141,6 +141,93 @@ import Testing
         #expect(try connection.scalar("SELECT count(*) FROM ATRANSACTION")?.int64 ?? 0 > 0)
     }
 
+    /// The shape of the history tables themselves, which `RawHistoryReader` reads by hand (Appendix A).
+    @Test func historyTableColumns() throws {
+        let (connection, _, _) = try open(.history)
+        #expect(
+            try connection.columnNames(ofTable: "ACHANGE") == [
+                "Z_PK", "Z_ENT", "Z_OPT", "ZCHANGETYPE", "ZENTITY", "ZENTITYPK", "ZTRANSACTIONID", "ZCOLUMNS",
+                "ZTOMBSTONE0", "ZTOMBSTONE1",
+            ])
+        // One `ZTOMBSTONE<n>` per attribute the model preserves — two, here — and no more.
+        #expect(
+            try connection.columnNames(ofTable: "ATRANSACTION") == [
+                "Z_PK", "Z_ENT", "Z_OPT", "ZAUTHORTS", "ZBUNDLEIDTS", "ZCONTEXTNAMETS", "ZPROCESSIDTS",
+                "ZTIMESTAMP", "ZAUTHOR", "ZBUNDLEID", "ZCONTEXTNAME", "ZPROCESSID", "ZQUERYGEN",
+            ])
+        // `ZENTITY` is the entity number, the same one `Z_ENT` carries in an entity's own table.
+        #expect(try connection.scalar("SELECT count(*) FROM ACHANGE WHERE ZENTITY NOT IN (1, 2)")?.int64 == 0)
+        // 13 inserts, 8 updates and one delete — which is what the fixture's five transactions did.
+        let counts = try connection.query("SELECT ZCHANGETYPE, count(*) FROM ACHANGE GROUP BY 1 ORDER BY 1")
+        #expect(counts.map { ($0[0].int64, $0[1].int64) }.map { [$0.0, $0.1] } == [[0, 13], [1, 8], [2, 1]])
+    }
+
+    /// `ACHANGE.ZCOLUMNS`: which properties a save wrote, as a big-endian bitmap.
+    ///
+    /// The rule this asserts is the whole of what `RawHistoryReader.Layout` knows, and it is not written down
+    /// anywhere Apple publishes: bit *n*, counted from the most significant bit of the first byte, is the *n*th
+    /// of the row's own entity's non-transient properties — **attributes and relationships in one list, sorted
+    /// by name**, not attributes first. It is deliberately not the column order of the entity's table, which for
+    /// `ZNOTE` is `ZPINNED, ZFOLDER, ZMODIFIEDAT, ZBODY, ZTITLE`.
+    @Test func historyChangedColumnsAreOnePropertyListInNameOrder() throws {
+        let (connection, _, location) = try open(.history)
+        let model = try self.model(of: location, connection)
+        let properties = Dictionary(
+            uniqueKeysWithValues: model.entities.map { entity in
+                (
+                    entity.name,
+                    (entity.attributes.filter { !$0.isTransient }.map(\.name)
+                        + entity.relationships.filter { !$0.isTransient }.map(\.name)).sorted()
+                )
+            })
+        #expect(properties["Note"] == ["body", "folder", "modifiedAt", "pinned", "title"])
+        #expect(properties["Folder"] == ["name", "notes"])
+
+        var written: [String: Set<Set<String>>] = [:]
+        for row in try connection.query(
+            """
+            SELECT p.Z_NAME, c.ZCOLUMNS FROM ACHANGE c
+            JOIN Z_PRIMARYKEY p ON p.Z_ENT = c.ZENTITY WHERE c.ZCHANGETYPE = 1
+            """)
+        {
+            let entity = try #require(row[0].string)
+            let names = try #require(properties[entity], "\(entity)")
+            let bitmap = try #require(row[1].data, "an update says which columns it wrote")
+            var decoded: Set<String> = []
+            for (byte, bits) in bitmap.enumerated() {
+                for offset in 0..<8 where bits & (0x80 >> UInt8(offset)) != 0 {
+                    let index = byte * 8 + offset
+                    // No bit may fall past the end of the list: that is the canary. A bitmap the model cannot
+                    // account for means the ordering rule moved, and every changed-property name is then a guess.
+                    #expect(index < names.count, "\(entity) bit \(index) of \(names.count)")
+                    if index < names.count { decoded.insert(names[index]) }
+                }
+            }
+            written[entity, default: []].insert(decoded)
+        }
+        // The fixture pins three notes in one save and retitles one in another; assigning notes to a folder
+        // writes the folder's to-many. Relationships share the numbering with attributes, which is the point.
+        #expect(written["Note"] == [["pinned"], ["title"]])
+        #expect(written["Folder"] == [["notes"]])
+    }
+
+    /// `ZTOMBSTONE<n>`: the values a delete kept, in the name order of the preserving attributes.
+    @Test func historyTombstoneColumnsFollowAttributeNameOrder() throws {
+        let (connection, _, location) = try open(.history)
+        let model = try self.model(of: location, connection)
+        let preserved = try #require(model.entity(named: "Note"))
+            .attributes.filter(\.preservesValueInHistoryOnDeletion).map(\.name).sorted()
+        #expect(preserved == ["modifiedAt", "title"])
+
+        let deletion = try #require(
+            try connection.query("SELECT ZTOMBSTONE0, ZTOMBSTONE1 FROM ACHANGE WHERE ZCHANGETYPE = 2").first)
+        // modifiedAt sorts first, so it is column 0 — a date, stored the way every Core Data date is.
+        #expect(deletion[0].double == 725_760_540.0)
+        #expect(deletion[1].string == "Note 9")
+        // And nothing else is kept: a tombstone is not a reading of the row.
+        #expect(try connection.scalar("SELECT count(*) FROM ACHANGE WHERE ZTOMBSTONE0 IS NOT NULL")?.int64 == 1)
+    }
+
     @Test func aPlainDatabaseIsNotCoreData() throws {
         let location = try TestFixtures.location(.notCoreData)
         let probe = try FormatProbe.probe(try SQLiteConnection(readOnly: location.storeURL))

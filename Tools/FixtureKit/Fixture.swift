@@ -30,6 +30,10 @@ public enum Fixture: String, CaseIterable, Sendable, Codable {
     case notCoreData
     /// High-entropy bytes with a `.sqlite` extension — what an encrypted database looks like.
     case encrypted
+    /// Many rows of one entity: 20,000 by default, as many as `DABBI_LARGE_ROWS` says for the perf baselines.
+    case large
+    /// Written by SwiftData from `@Model` classes, under SwiftData's default file name.
+    case swiftData
 }
 
 public struct FixtureManifest: Sendable, Hashable, Codable {
@@ -108,6 +112,8 @@ public enum FixtureBuilder {
             case .noModelCache: try ModelFileFixtures.buildNoModelCache(in: directory)
             case .notCoreData: try ForeignFixtures.buildNotCoreData(in: directory)
             case .encrypted: try ForeignFixtures.buildEncrypted(in: directory)
+            case .large: try LargeFixture.build(in: directory)
+            case .swiftData: try SwiftDataFixture.build(in: directory)
             }
 
         let encoder = JSONEncoder()

@@ -2,7 +2,7 @@
 import Foundation
 
 /// `Party` (abstract) ⟵ `Organisation`, `Person` ⟵ `Employee` ⟵ `Manager`, plus `Department` and `Tag`.
-enum CompanyFixture {
+public enum CompanyFixture {
     static let organisations = 3
     static let plainPeople = 35
     static let plainEmployees = 20
@@ -10,7 +10,7 @@ enum CompanyFixture {
     static let departments = 4
     static let tags = 8
 
-    static func makeModel() -> NSManagedObjectModel {
+    public static func makeModel() -> NSManagedObjectModel {
         let party = entity(
             "Party", abstract: true,
             [
