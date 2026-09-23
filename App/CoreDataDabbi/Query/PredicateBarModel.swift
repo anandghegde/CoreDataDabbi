@@ -32,6 +32,13 @@ final class PredicateBarModel {
     private(set) var status: Status = .empty
     /// The entity the field is about — the one the grid shows.
     private(set) var entity: String?
+    /// The saved predicate the grid shows the entity through, whose text the field then holds (PRD-3).
+    private(set) var savedPredicate: UUID?
+    /// Whether the visual builder is open under the field (M2-03). The text stays the predicate either way:
+    /// the builder is another way of writing it, not a second filter.
+    var isShowingBuilder = false
+    /// The key paths the builder offers for ``entity``.
+    private(set) var schema: BuilderSchema?
 
     @ObservationIgnored private var validator: PredicateValidator?
     @ObservationIgnored private var completer: PredicateCompleter?
@@ -51,16 +58,19 @@ final class PredicateBarModel {
     /// one of the things it reads has changed.
     func follow() {
         let entity = context.selectedEntity
+        let savedPredicate = context.navigation.current?.savedPredicate
         let session = context.session.map(ObjectIdentifier.init)
-        let applied = entity.flatMap { context.layout(of: $0).filter }?.format
+        let applied = context.shownLayout.filter?.format
 
-        guard entity == self.entity, session == shownSession else {
-            // Another entity, or another store: this is somebody else's predicate now.
+        guard entity == self.entity, savedPredicate == self.savedPredicate, session == shownSession else {
+            // Another entity, another saved predicate or another store: this is somebody else's predicate now.
             self.entity = entity
+            self.savedPredicate = savedPredicate
             shownSession = session
             let model = context.model
             validator = model.map(PredicateValidator.init)
             completer = model.map(PredicateCompleter.init)
+            schema = model.flatMap { model in entity.map { BuilderSchema(model: model, entity: $0) } }
             synced = applied
             text = applied ?? ""
             // The same text against another model can mean something else, so it is checked again either way.
@@ -87,7 +97,7 @@ final class PredicateBarModel {
     var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// The filter the grid is showing.
-    var appliedFilter: PredicateSource? { entity.flatMap { context.layout(of: $0).filter } }
+    var appliedFilter: PredicateSource? { entity == nil ? nil : context.shownLayout.filter }
     var isFiltering: Bool { appliedFilter != nil }
     /// Whether what is typed is what the grid is showing — nothing to apply, and nothing to revert.
     var isApplied: Bool { trimmed == appliedFilter?.format ?? "" }
@@ -122,17 +132,77 @@ final class PredicateBarModel {
         }
     }
 
+    // MARK: The builder
+
+    /// What the builder shows for the text as it stands.
+    enum BuilderContent: Equatable {
+        /// Rows: a tree shaped for `NSPredicateEditor`, and the schema its templates come from — the entity's
+        /// own, with any deeper key path the predicate names added.
+        case rows(PredicateAST, BuilderSchema)
+        /// The predicate can only be written as text, for these reasons.
+        case text([String])
+    }
+
+    /// `nil` when there is no model to build rows from.
+    var builderContent: BuilderContent? {
+        guard let schema else { return nil }
+        let format = trimmed
+        guard !format.isEmpty else { return .rows(.and([]), schema) }
+        if case .invalid(let diagnostic) = status { return .text([diagnostic.message]) }
+        let ast: PredicateAST
+        do {
+            ast = try PredicateAST.parse(format)
+        } catch {
+            return .text([error.localizedDescription])
+        }
+        switch schema.presentation(of: ast) {
+        case .rows(let shaped): return .rows(shaped, schema.including(shaped))
+        case .custom(let obstacles): return .text(obstacles.map(\.message))
+        }
+    }
+
+    /// Writes what the builder says into the field. An empty builder is no filter, which is an empty field.
+    func takeFromBuilder(_ predicate: NSPredicate) {
+        let ast = PredicateAST(predicate)
+        switch ast {
+        case .all, .and([]):
+            text = ""
+        default:
+            // A predicate the builder made always formats; were one not to, the field keeps what it had.
+            if let format = try? ast.formatString() { text = format }
+        }
+    }
+
     // MARK: What the user does
 
     /// Filters the grid by what is typed, or — when it is empty — stops filtering it.
     func apply() {
-        guard let entity, canApply else { return }
+        guard entity != nil, canApply else { return }
         let format = trimmed
         // What is applied is what was checked: the field keeps the tidied text, not the stray spaces.
         text = format
         let filter = format.isEmpty ? nil : PredicateSource(format: format)
         synced = filter?.format
-        context.setFilter(filter, of: entity)
+        context.setShownFilter(filter)
+    }
+
+    /// Starts a predicate from nothing (PRD-3): the entity's own rows, one row in the builder on its `name` or
+    /// `title`, and nothing applied until there is a value to filter by. Saving it is a separate step.
+    ///
+    /// - Returns: whether there was a row to start on — an entity with no such field starts with an empty
+    ///   builder, and the keyboard goes to the field instead.
+    @discardableResult
+    func startNewPredicate() -> Bool {
+        guard let location = context.navigation.current else { return false }
+        if location.savedPredicate != nil { context.select(entity: location.entity) }
+        follow()
+        isShowingBuilder = true
+        guard let starter = schema?.starterPredicate, let format = try? starter.formatString() else {
+            text = ""
+            return false
+        }
+        text = format
+        return true
     }
 
     /// Empties the field and shows every row again.

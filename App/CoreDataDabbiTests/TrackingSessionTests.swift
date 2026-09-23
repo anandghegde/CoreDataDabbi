@@ -44,7 +44,7 @@ import Testing
             alreadyRead: @escaping @MainActor () -> [RowPage] = { [] }
         ) async {
             tracking.start(on: session, entity: entity, filter: filter, alreadyRead: alreadyRead)
-            await tracking.whenStarted()
+            await tracking.whenSettled()
         }
 
         func commit(_ body: (StoreWriter) throws -> Void) throws {
@@ -140,6 +140,9 @@ import Testing
         #expect(!world.tracking.canResume)
 
         world.tracking.pause()
+        // The button changes state at once; the tracker hears of it a moment later, and a save in that moment
+        // is read. That is fine for a person and not for a test that says nothing is read while paused.
+        await world.tracking.whenSettled()
         #expect(world.tracking.state == .paused)
         #expect(world.tracking.isRunning, "paused is still tracking; it is reading that stopped")
         #expect(world.tracking.canResume)

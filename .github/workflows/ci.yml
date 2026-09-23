@@ -110,6 +110,48 @@ jobs:
           path: ${{ runner.temp }}/snapshots
           if-no-files-found: ignore
 
+  e2e:
+    name: End to end (iOS simulator)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # The writer app is built with Xcode, for the simulator SDK that `swift test` on its own has no way to
+      # reach (M2-11).
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.4.app
+
+      - name: Cache the build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: e2e-macos-26-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: |
+            e2e-macos-26-${{ hashFiles('Package.resolved') }}-
+
+      # Booting takes the best part of a minute on a runner, and a device that is still booting when the first
+      # install arrives fails it. The script waits, but doing it here means the wait is a step of its own in
+      # the log rather than a mysteriously slow test.
+      - name: Boot a simulator
+        run: echo "DABBI_WRITER_UDID=$(Scripts/e2e.sh device)" >> "$GITHUB_ENV"
+
+      # An app saves in the simulator; the tracker says so here. This is the M2 exit criterion.
+      - name: Track a real app
+        run: Scripts/e2e.sh run
+
+      # What the device had to say for itself, for a failure that cannot be reproduced on a desk.
+      - name: Keep the simulator log
+        if: failure()
+        run: xcrun simctl spawn "$DABBI_WRITER_UDID" log collect --output "${{ runner.temp }}/simulator.logarchive" || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: simulator-log
+          path: ${{ runner.temp }}/simulator.logarchive
+          if-no-files-found: ignore
+
   lint:
     name: Lint and layering
     runs-on: macos-26

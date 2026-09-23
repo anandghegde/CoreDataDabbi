@@ -6,7 +6,8 @@ import Foundation
 /// ```
 /// MyApp.dabbi/
 /// ├─ project.json        Project — shareable
-/// ├─ predicates/ diagrams/ sql/ snapshots/        (later milestones; carried along untouched until then)
+/// ├─ predicates/*.json   SavedPredicate, one per file — shareable
+/// ├─ diagrams/ sql/ snapshots/        (later milestones; carried along untouched until then)
 /// └─ local/state.json    LocalState — this machine only; may live outside the package instead
 /// ```
 ///
@@ -21,15 +22,26 @@ public struct ProjectPackage: Sendable, Hashable {
     static let projectFileName = "project.json"
     static let localFolderName = "local"
     static let localFileName = "state.json"
+    static let predicatesFolderName = "predicates"
 
     public var project: Project
     public var local: LocalState
+    /// In no particular order; whoever lists them sorts them for the reader.
+    public var predicates: [SavedPredicate]
     private var unknownProjectKeys = JSONValue.emptyObject
     private var unknownLocalKeys = JSONValue.emptyObject
+    /// Per predicate that was read: its file's name, and what in it this version did not understand.
+    private var predicateFiles: [UUID: PredicateFile] = [:]
 
-    public init(project: Project = Project(), local: LocalState = LocalState()) {
+    private struct PredicateFile: Sendable, Hashable {
+        var name: String
+        var unknownKeys: JSONValue
+    }
+
+    public init(project: Project = Project(), local: LocalState = LocalState(), predicates: [SavedPredicate] = []) {
         self.project = project
         self.local = local
+        self.predicates = predicates
     }
 
     /// Where local state goes when a project keeps it out of its package: one folder per project ID under this.
@@ -52,6 +64,7 @@ public struct ProjectPackage: Sendable, Hashable {
         }
         var package = ProjectPackage()
         (package.project, package.unknownProjectKeys) = try decode(Project.self, from: data, migrating: true)
+        package.readPredicates(from: wrapper.fileWrappers?[predicatesFolderName])
 
         let localData =
             switch package.project.localStatePlacement {
@@ -80,6 +93,21 @@ public struct ProjectPackage: Sendable, Hashable {
                 arguments: ["path": url.path], underlying: error)
         }
         return try read(from: wrapper, externalLocalRoot: externalLocalRoot)
+    }
+
+    /// A predicate file that cannot be read is left where it is — on disk and out of the list — rather than
+    /// failing the project over one file, or being lost the next time the project is saved. So is a second file
+    /// claiming an ID the first one already had.
+    private mutating func readPredicates(from folder: FileWrapper?) {
+        guard let files = folder?.fileWrappers else { return }
+        for (name, file) in files.sorted(by: { $0.key < $1.key }) where name.hasSuffix(".json") {
+            guard let data = file.regularFileContents,
+                let (predicate, unknown) = try? Self.decode(SavedPredicate.self, from: data, migrating: false),
+                predicateFiles[predicate.id] == nil
+            else { continue }
+            predicates.append(predicate)
+            predicateFiles[predicate.id] = PredicateFile(name: name, unknownKeys: unknown)
+        }
     }
 
     private static func decode<T: Codable>(
@@ -132,6 +160,7 @@ public struct ProjectPackage: Sendable, Hashable {
             Self.replace(
                 Self.projectFileName, in: root,
                 with: try ProjectJSON.data(try ProjectJSON.tree(project).merging(unknownProjectKeys)))
+            try writePredicates(into: root)
 
             switch project.localStatePlacement {
             case .inPackage:
@@ -180,6 +209,38 @@ public struct ProjectPackage: Sendable, Hashable {
                 arguments: ["path": url.path], underlying: error)
         }
         try writeExternalLocalState(root: externalLocalRoot)
+    }
+
+    /// Writes each predicate to the file it was read from, or to `<id>.json`, and removes the files of those
+    /// that have been deleted. Files this version could not read are not its to remove.
+    private func writePredicates(into root: FileWrapper) throws {
+        let existing = root.fileWrappers?[Self.predicatesFolderName].flatMap { $0.isDirectory ? $0 : nil }
+        guard existing != nil || !predicates.isEmpty else { return }
+        let folder =
+            existing
+            ?? {
+                let folder = FileWrapper(directoryWithFileWrappers: [:])
+                folder.preferredFilename = Self.predicatesFolderName
+                root.addFileWrapper(folder)
+                return folder
+            }()
+        let kept = Set(predicates.map(\.id))
+        let readFrom = Dictionary(predicateFiles.map { ($1.name, $0) }, uniquingKeysWith: { first, _ in first })
+        for (name, file) in folder.fileWrappers ?? [:] {
+            // One read from here — or one written since, which is known by its name and by being ours to read.
+            let id =
+                readFrom[name]
+                ?? file.regularFileContents.flatMap { data in
+                    (try? ProjectJSON.decoder().decode(SavedPredicate.self, from: data))
+                        .flatMap { "\($0.id.uuidString).json" == name ? $0.id : nil }
+                }
+            if let id, !kept.contains(id) { folder.removeFileWrapper(file) }
+        }
+        for predicate in predicates {
+            let file = predicateFiles[predicate.id]
+            let tree = try ProjectJSON.tree(predicate).merging(file?.unknownKeys ?? .emptyObject)
+            Self.replace(file?.name ?? "\(predicate.id.uuidString).json", in: folder, with: try ProjectJSON.data(tree))
+        }
     }
 
     private func localData() throws -> Data {

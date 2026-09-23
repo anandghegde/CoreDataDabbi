@@ -1,80 +1,78 @@
-@preconcurrency import CoreData
 import ArgumentParser
 import FixtureKit
 import Foundation
 
-/// Plays the running app in tracking tests: applies scripted mutations to a Notes store (the `history` and
-/// `walOnly` fixtures) and prints each committed change as one line of JSON — the expected change set.
+/// Plays the running app in tracking tests: applies `WriterScript` to a Notes store and reports what it changed.
+///
+/// The Mac half of the writer (M0-08). Its iOS-simulator twin is `Tools/Writer/iOS`, and both run the same
+/// `WriterScript`, so what the end-to-end test asserts is one script's account of itself, not two.
 @main
 struct Writer: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "Writer",
-        abstract: "Mutates a Notes fixture store the way a running app would, and reports what it changed."
+        abstract: "Mutates a Notes store the way a running app would, and reports what it changed.",
+        subcommands: [Seed.self, Run.self],
+        defaultSubcommand: Run.self
     )
 
-    @Argument(help: "A store made from the Notes fixture model.")
-    var store: String
+    struct Options: ParsableArguments {
+        @Argument(help: "The store to write. Made by `seed`, which overwrites whatever is there.")
+        var store: String
 
-    @Option(help: "How many transactions to commit.")
-    var count = 10
+        @Option(help: "Where to write the JSON report. Standard output when not given.")
+        var report: String?
 
-    @Option(name: .customLong("interval-ms"), help: "Pause between transactions, in milliseconds.")
-    var intervalMilliseconds = 200
+        @Option(name: .customLong("interval-ms"), help: "Pause between transactions, in milliseconds.")
+        var intervalMilliseconds = 250
 
-    @Flag(help: "Open the store with persistent history tracking.")
-    var history = false
+        var storeURL: URL { URL(fileURLWithPath: store) }
 
-    struct Change: Codable, Sendable {
-        var transaction: Int
-        var operation: String
-        var entity: String
-        var pk: Int64
+        func script() -> WriterScript {
+            WriterScript(writer: "macOS", intervalMilliseconds: intervalMilliseconds)
+        }
+
+        func emit(_ report: WriterScript.Report) throws {
+            let data = try report.data
+            if let path = self.report {
+                try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+            } else {
+                FileHandle.standardOutput.write(data)
+                FileHandle.standardOutput.write(Data("\n".utf8))
+            }
+        }
     }
 
-    func run() throws {
-        let writer = try StoreWriter(
-            model: NotesFixture.makeModel(),
-            storeURL: URL(fileURLWithPath: store),
-            options: history ? NotesFixture.historyOptions : [:],
-            author: "writer"
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
+    /// Makes the store and commits the rows the tracker primes over.
+    struct Seed: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "seed", abstract: "Creates the store and commits the rows tracking starts from.")
 
-        for transaction in 0..<count {
-            let changes: [Change] = try writer.context.performAndWait {
-                let context = writer.context
-                let request = NSFetchRequest<NSManagedObject>(entityName: "Note")
-                request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-                let notes = try context.fetch(request)
+        @OptionGroup var options: Options
 
-                // A fixed rotation: insert, update, insert, delete.
-                var touched: [(String, NSManagedObject)] = []
-                switch transaction % 4 {
-                case 1 where !notes.isEmpty:
-                    let note = notes[transaction % notes.count]
-                    note.setValue("Edited in transaction \(transaction)", forKey: "body")
-                    touched.append(("update", note))
-                case 3 where !notes.isEmpty:
-                    let note = notes[transaction % notes.count]
-                    touched.append(("delete", note))
-                    context.delete(note)
-                default:
-                    touched.append(("insert", writer.insert("Note", ["title": "Writer note \(transaction)"])))
-                }
-                try context.obtainPermanentIDs(for: touched.map(\.1))
-                try context.save()
-                return touched.map { operation, object in
-                    let pk = Int64(object.objectID.uriRepresentation().lastPathComponent.dropFirst()) ?? -1
-                    return Change(transaction: transaction, operation: operation, entity: "Note", pk: pk)
-                }
-            }
-            for change in changes {
-                print(String(decoding: try encoder.encode(change), as: UTF8.self))
-            }
-            fflush(stdout)
-            Thread.sleep(forTimeInterval: Double(intervalMilliseconds) / 1000)
+        func run() throws {
+            try options.emit(try options.script().seed(into: options.storeURL))
         }
-        try writer.close()
+    }
+
+    /// Commits the script, one transaction per step.
+    struct Run: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "run", abstract: "Commits the script against a seeded store, one step per transaction.")
+
+        @OptionGroup var options: Options
+
+        @Flag(help: "Print each change as a line of JSON as it is committed.")
+        var follow = false
+
+        func run() throws {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let report = try options.script().run(on: options.storeURL) { change in
+                guard follow, let line = try? encoder.encode(change) else { return }
+                FileHandle.standardError.write(line)
+                FileHandle.standardError.write(Data("\n".utf8))
+            }
+            try options.emit(report)
+        }
     }
 }

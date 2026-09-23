@@ -354,3 +354,99 @@ private func fullProject() -> Project {
                 ]))
     }
 }
+
+@Suite struct SavedPredicateTests {
+    private func adults(id: UUID = UUID()) -> SavedPredicate {
+        SavedPredicate(
+            id: id, name: "Adults", entity: "Person", predicate: PredicateSource(format: "age >= 18"),
+            columns: [ColumnLayout(property: "name", width: 120)], sort: [SortKey(keyPath: "age", ascending: false)])
+    }
+
+    @Test func eachPredicateIsAFileOfItsOwn() throws {
+        let scratch = try Scratch()
+        let url = scratch.file("Saved.dabbi")
+        let first = adults()
+        let second = SavedPredicate(name: "Everyone", entity: "Person", predicate: nil)
+        try ProjectPackage(project: fullProject(), predicates: [first, second]).write(to: url)
+
+        let file = try json(url.appendingPathComponent("predicates/\(first.id.uuidString).json"))
+        #expect(file["name"] as? String == "Adults")
+        #expect(file["entity"] as? String == "Person")
+        #expect((file["predicate"] as? [String: Any])?["format"] as? String == "age >= 18")
+        let everyone = try json(url.appendingPathComponent("predicates/\(second.id.uuidString).json"))
+        #expect(everyone["predicate"] == nil, "no predicate is every row, and says nothing")
+
+        let read = try ProjectPackage.read(at: url)
+        #expect(Set(read.predicates) == [first, second])
+    }
+
+    @Test func aProjectWithoutPredicatesHasNoFolderForThem() throws {
+        let wrapper = try ProjectPackage(project: fullProject()).fileWrapper()
+        #expect(wrapper.fileWrappers?["predicates"] == nil)
+    }
+
+    @Test func aDeletedPredicateTakesItsFileWithIt() throws {
+        let scratch = try Scratch()
+        let url = scratch.file("Deleted.dabbi")
+        let (kept, gone) = (adults(), SavedPredicate(name: "Old", entity: "Person", predicate: nil))
+        try ProjectPackage(project: fullProject(), predicates: [kept, gone]).write(to: url)
+
+        var package = try ProjectPackage.read(at: url)
+        package.predicates.removeAll { $0.id == gone.id }
+        // Added and deleted again without the project being read in between: known by its name, not its reading.
+        let brief = SavedPredicate(name: "Brief", entity: "Person", predicate: nil)
+        package.predicates.append(brief)
+        try package.write(to: url)
+        package.predicates.removeAll { $0.id == brief.id }
+        try package.write(to: url)
+
+        let names = try FileManager.default.contentsOfDirectory(atPath: url.appendingPathComponent("predicates").path)
+        #expect(names == ["\(kept.id.uuidString).json"])
+    }
+
+    @Test func aFileItCannotReadIsLeftAlone() throws {
+        let scratch = try Scratch()
+        let url = scratch.file("Mixed.dabbi")
+        let predicate = adults()
+        try ProjectPackage(project: fullProject(), predicates: [predicate]).write(to: url)
+        let folder = url.appendingPathComponent("predicates")
+        // A hand-named file, one from the future with a key this version does not know, and one that is damaged.
+        try Data(#"{"id": "\#(predicate.id.uuidString)", "name": "Twin", "entity": "Person"}"#.utf8)
+            .write(to: folder.appendingPathComponent("twin.json"))
+        let future = UUID()
+        try Data(
+            #"{"id": "\#(future.uuidString)", "name": "Future", "entity": "Person", "chart": "bar"}"#.utf8
+        ).write(to: folder.appendingPathComponent("future.json"))
+        try Data("not json".utf8).write(to: folder.appendingPathComponent("\(UUID().uuidString).json"))
+
+        var package = try ProjectPackage.read(at: url)
+        #expect(package.predicates.count == 2, "a second file claiming an ID already read is not a predicate")
+        package.predicates = package.predicates.map { saved in
+            var saved = saved
+            saved.name += "!"
+            return saved
+        }
+        try package.write(to: url)
+
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).count == 4)
+        let rewritten = try json(folder.appendingPathComponent("future.json"))
+        #expect(rewritten["name"] as? String == "Future!", "written back to the file it came from")
+        #expect(rewritten["chart"] as? String == "bar")
+    }
+
+    @Test func itsLayoutIsItsColumnsSortAndItself() {
+        var predicate = adults()
+        #expect(predicate.layout.filter == PredicateSource(format: "age >= 18"))
+        #expect(predicate.layout.displayAttribute == nil)
+        predicate.layout = EntityLayout(sort: [SortKey(keyPath: "name")], filter: nil, displayAttribute: "name")
+        #expect(predicate.sort == [SortKey(keyPath: "name")])
+        #expect(predicate.columns.isEmpty)
+        #expect(predicate.predicate == nil)
+    }
+
+    @Test func namesAreMadeUniqueTheWayTheFinderDoesIt() {
+        #expect(SavedPredicate.uniqueName("Adults", among: []) == "Adults")
+        #expect(SavedPredicate.uniqueName("Adults", among: ["adults"]) == "Adults 2")
+        #expect(SavedPredicate.uniqueName("Adults", among: ["Adults", "Adults 2"]) == "Adults 3")
+    }
+}

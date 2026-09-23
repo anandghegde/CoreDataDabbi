@@ -1,0 +1,32 @@
+// The scripted writer's iOS-simulator target (M2-11, `Tools/Writer/iOS`).
+//
+// It is in this project rather than one of its own because ADR-06 says a clone opens and builds with no extra
+// tools, and a second `.xcodeproj` referencing the same local package would be a second thing to keep in step.
+// It is never shipped: it is installed in a simulator by the end-to-end test and nowhere else.
+
+PRODUCT_NAME = WriterApp
+PRODUCT_BUNDLE_IDENTIFIER = org.coredatadabbi.WriterApp
+
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphonesimulator
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+TARGETED_DEVICE_FAMILY = 1,2
+
+// No `Info.plist` to keep in step: everything this app declares, it declares here.
+GENERATE_INFOPLIST_FILE = YES
+INFOPLIST_KEY_CFBundleDisplayName = Dabbi Writer
+INFOPLIST_KEY_UILaunchScreen_Generation = YES
+INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES
+INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait
+
+// A simulator build for a test never leaves this machine.
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = -
+CODE_SIGNING_REQUIRED = NO
+CODE_SIGNING_ALLOWED = NO
+ENABLE_HARDENED_RUNTIME = NO
+
+// The Mac app cannot be sandboxed (it reads other apps' containers); this one has no such reason not to be.
+ENABLE_APP_SANDBOX = NO
+
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks

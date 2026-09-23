@@ -19,8 +19,11 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
 
     /// What the grid currently shows, so that a change to anything else does not reopen the pager.
     private var shownEntity: String?
+    /// The saved predicate the entity is seen through. Another has other columns, even with the same rows.
+    private var shownPredicate: UUID?
     private var shownSort: [SortKey] = []
     private var shownFilter: PredicateSource?
+    private var shownCap: Int?
     private var shownSession: ObjectIdentifier?
     /// Bumped per open; a pager that arrives after another open started is dropped.
     private var openAttempt = 0
@@ -111,18 +114,25 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     private func observe() {
         let session = context.session
         let location = context.navigation.current
-        let layout = location.map { context.layout(of: $0.entity) }
+        let layout = location.map { context.layout(at: $0) }
         let sort = layout?.sort ?? []
-        // The predicate bar applies by writing it here, which is what brings the grid back through this (§7.1).
-        let filter = layout?.filter
+        // The predicate bar applies by writing it here, which is what brings the grid back through this (§7.1);
+        // the quick filter narrows it (PRD-6).
+        let filter = location.flatMap { context.fetchFilter(at: $0) }
+        // A fetch-request template's limit is part of what it asks for (BRW-1).
+        let cap = location?.fetchRequest?.limit
         // Reading the time zone here means changing it redraws the grid.
         _ = context.timeZone
 
         let identity = session.map(ObjectIdentifier.init)
-        if location?.entity != shownEntity || sort != shownSort || filter != shownFilter || identity != shownSession {
+        if location?.entity != shownEntity || location?.savedPredicate != shownPredicate || sort != shownSort
+            || filter != shownFilter || cap != shownCap || identity != shownSession
+        {
             shownEntity = location?.entity
+            shownPredicate = location?.savedPredicate
             shownSort = sort
             shownFilter = filter
+            shownCap = cap
             shownSession = identity
             open(entity: location?.entity, sort: sort, filter: filter, in: session)
         } else {
@@ -145,7 +155,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         }
         footer.show(.loading)
 
-        let spec = FetchSpec(entity: entity, predicate: filter, sort: sort, limit: Self.firstPage)
+        let spec = FetchSpec(
+            entity: entity, predicate: filter, sort: sort, limit: min(Self.firstPage, shownCap ?? .max))
         openTask = Task { [weak self] in
             let handle: PagerHandle
             do {
@@ -177,7 +188,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         _ handle: PagerHandle, of entity: EntityDescription, in model: ModelDescription, session: StoreSession
     ) {
         columns = GridColumn.columns(
-            for: entity, in: model, reading: handle.columns, layout: context.layout(of: entity.name))
+            for: entity, in: model, reading: handle.columns, layout: context.shownLayout)
         rebuildTableColumns()
 
         let paged = PagedRows(session: session, handle: handle, columns: columns.columnSet)
@@ -252,8 +263,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
 
     /// Writes the columns back to the project, and re-reads if what is read has changed.
     private func persistColumns(reread: Bool) {
-        guard let entity = shownEntity else { return }
-        context.updateLayout(of: entity) { $0.columns = GridColumn.layout(of: columns) }
+        guard shownEntity != nil else { return }
+        context.updateShownLayout { $0.columns = GridColumn.layout(of: columns) }
         if reread { rows?.setColumns(columns.columnSet) }
     }
 
@@ -347,9 +358,9 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     }
 
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
-        guard !isUpdating, let entity = shownEntity else { return }
+        guard !isUpdating, shownEntity != nil else { return }
         guard let changed = tableView.sortDescriptors.first else {
-            applySort([], to: entity)
+            applySort([])
             return
         }
         var keys = shownSort
@@ -363,15 +374,15 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
             keys = [key]
         }
         isShiftClickingHeader = false
-        applySort(keys, to: entity)
+        applySort(keys)
     }
 
-    private func applySort(_ keys: [SortKey], to entity: String) {
+    private func applySort(_ keys: [SortKey]) {
         isUpdating = true
         tableView.sortDescriptors = keys.map { NSSortDescriptor(key: $0.keyPath, ascending: $0.ascending) }
         isUpdating = false
         // The layout change comes back through the observation loop, which reopens the pager.
-        context.updateLayout(of: entity) { $0.sort = keys }
+        context.updateShownLayout { $0.sort = keys }
     }
 
     // MARK: Rows
@@ -470,7 +481,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         guard let rows else { return }
         footer.show(.loading)
         Task { [weak self] in
-            _ = try? await rows.loadMore()
+            // Up to a template's limit and no further.
+            _ = try? await rows.loadMore(count: self?.shownCap.map { min(Self.firstPage, max($0 - rows.count, 1)) })
             guard let self, self.rows === rows else { return }
             self.tableView.noteNumberOfRowsChanged()
             self.updateVisibleRows()
@@ -483,7 +495,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
             footer.show(.empty)
             return
         }
-        footer.show(.rows(count: rows.count, hasMore: rows.hasMore))
+        footer.show(.rows(count: rows.count, hasMore: rows.hasMore && rows.count < (shownCap ?? .max)))
     }
 }
 

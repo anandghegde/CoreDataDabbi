@@ -4,6 +4,17 @@
     "" : {
 
     },
+    "$%@ needs %@." : {
+      "comment" : "Fetch request prompt",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "$%1$@ needs %2$@."
+          }
+        }
+      }
+    },
     "%@ of %@" : {
       "localizations" : {
         "en" : {
@@ -69,6 +80,17 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "%@, compared with %@" : {
+      "comment" : "Fetch request prompt field",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, compared with %2$@"
           }
         }
       }
@@ -163,6 +185,9 @@
     "1 store" : {
 
     },
+    "1, 2, 3" : {
+      "comment" : "Placeholder of a list of values"
+    },
     "A .dabbi project saved earlier" : {
 
     },
@@ -223,8 +248,17 @@
     "Cached model" : {
 
     },
+    "Cancel" : {
+
+    },
+    "Cannot be run" : {
+      "comment" : "Fetch request warning badge"
+    },
     "Cascade" : {
 
+    },
+    "Case and accents" : {
+      "comment" : "Predicate builder pop-up"
     },
     "Change" : {
       "comment" : "Tracking log column: what happened to a row"
@@ -276,6 +310,9 @@
     },
     "Columns (%lld)" : {
 
+    },
+    "Comparison" : {
+      "comment" : "Predicate builder pop-up"
     },
     "Composite type" : {
 
@@ -337,6 +374,9 @@
     "Default" : {
 
     },
+    "Delete" : {
+      "comment" : "Saved predicate context menu"
+    },
     "Delete rule" : {
 
     },
@@ -367,11 +407,14 @@
     "Device, app or store" : {
 
     },
+    "Does not fit the model" : {
+      "comment" : "Saved predicate warning badge"
+    },
     "Drop a store, an app bundle or an .xcappdata container here." : {
 
     },
     "Duplicate" : {
-
+      "comment" : "Saved predicate context menu"
     },
     "Edit" : {
 
@@ -392,6 +435,9 @@
 
     },
     "Entity" : {
+
+    },
+    "Every %@" : {
 
     },
     "Expand" : {
@@ -430,6 +476,9 @@
     "Forward" : {
 
     },
+    "From" : {
+      "comment" : "Predicate builder: first value of BETWEEN"
+    },
     "From %@" : {
 
     },
@@ -455,6 +504,9 @@
 
     },
     "Hide Others" : {
+
+    },
+    "Hide Predicate Builder" : {
 
     },
     "Hide earlier versions" : {
@@ -486,6 +538,9 @@
     },
     "Kept in history" : {
 
+    },
+    "Key path" : {
+      "comment" : "Predicate builder pop-up"
     },
     "Keyed archive" : {
 
@@ -547,14 +602,20 @@
     "Minimum length" : {
 
     },
+    "Missing %@" : {
+      "comment" : "Saved predicate warning badge; the key paths the model no longer has"
+    },
     "Model file" : {
 
     },
     "Move To…" : {
 
     },
-    "No" : {
+    "New Predicate" : {
 
+    },
+    "No" : {
+      "comment" : "Fetch request prompt: a Boolean value"
     },
     "No Store" : {
 
@@ -594,6 +655,9 @@
     },
     "No stores" : {
 
+    },
+    "No text to search" : {
+      "comment" : "Placeholder of the quick filter field, disabled"
     },
     "No value" : {
       "comment" : "Spoken for a NULL column"
@@ -694,6 +758,12 @@
     "Pick an app's store from a simulator" : {
 
     },
+    "Predicate builder" : {
+
+    },
+    "Quantifier" : {
+      "comment" : "Predicate builder pop-up"
+    },
     "Quit %@" : {
 
     },
@@ -742,6 +812,9 @@
     "Reload Store" : {
 
     },
+    "Rename" : {
+      "comment" : "Saved predicate context menu"
+    },
     "Rename…" : {
 
     },
@@ -766,11 +839,20 @@
     "Rows" : {
 
     },
+    "Run" : {
+      "comment" : "Fetch request prompt button"
+    },
     "Run an app on this simulator, and its stores will show up here." : {
 
     },
+    "Run “%@”" : {
+      "comment" : "Fetch request prompt title"
+    },
     "Runtime not installed" : {
 
+    },
+    "Run…" : {
+      "comment" : "Fetch request context menu"
     },
     "SHA-256 %@" : {
 
@@ -781,7 +863,19 @@
     "SQLite" : {
 
     },
+    "Save Predicate" : {
+
+    },
+    "Saved Predicates" : {
+
+    },
     "Save…" : {
+
+    },
+    "Search" : {
+      "comment" : "Placeholder of the quick filter field"
+    },
+    "Search Rows" : {
 
     },
     "Secure unarchiving (the default)" : {
@@ -823,6 +917,9 @@
     "Show Other Databases" : {
 
     },
+    "Show Predicate Builder" : {
+
+    },
     "Show Rows" : {
       "comment" : "Leaves the change log for the grid"
     },
@@ -858,6 +955,9 @@
     },
     "Shown as source. Rendering HTML will come with a per-project choice." : {
 
+    },
+    "Shows the rows with the text in %@" : {
+      "comment" : "Tooltip of the quick filter field; the list is of attribute names"
     },
     "Simulators" : {
 
@@ -898,7 +998,13 @@
     "Text" : {
 
     },
+    "That is not a value this row can compare with." : {
+
+    },
     "The PDF could not be read." : {
+
+    },
+    "The builder could not show this predicate. It is kept as text." : {
 
     },
     "The field could not be read." : {
@@ -937,6 +1043,9 @@
     "The table could not be read." : {
 
     },
+    "There is no model to build a predicate from." : {
+
+    },
     "There is no text in these bytes." : {
 
     },
@@ -946,11 +1055,17 @@
     "This object's “%@” is empty." : {
 
     },
+    "This predicate can only be edited as text." : {
+      "comment" : "Predicate builder, for a predicate it has no rows for"
+    },
     "This project has no store yet" : {
 
     },
     "This row has no such property." : {
 
+    },
+    "To" : {
+      "comment" : "Predicate builder: second value of BETWEEN"
     },
     "To-many" : {
 
@@ -988,6 +1103,9 @@
     "UNIQUE" : {
 
     },
+    "UUID" : {
+      "comment" : "Placeholder of a UUID field"
+    },
     "Undo" : {
 
     },
@@ -1005,6 +1123,9 @@
     },
     "Validation" : {
 
+    },
+    "Value" : {
+      "comment" : "Predicate builder value"
     },
     "Value class" : {
 
@@ -1053,7 +1174,7 @@
 
     },
     "Yes" : {
-
+      "comment" : "Fetch request prompt: a Boolean value"
     },
     "Yes — its rows are its subentities'" : {
 
@@ -1067,14 +1188,80 @@
     "Zoom" : {
 
     },
+    "a URL" : {
+      "comment" : "Fetch request prompt: a value's kind"
+    },
+    "a UUID" : {
+      "comment" : "Fetch request prompt: a value's kind"
+    },
+    "a comma-separated list of %@" : {
+      "comment" : "Fetch request prompt"
+    },
+    "a number" : {
+      "comment" : "Fetch request prompt: a value's kind"
+    },
     "a relationship's join table could not be confirmed" : {
 
+    },
+    "a whole number" : {
+      "comment" : "Fetch request prompt: a value's kind"
+    },
+    "a, \"b, c\", d" : {
+      "comment" : "Placeholder of a list of strings"
+    },
+    "an ISO 8601 date" : {
+      "comment" : "Fetch request prompt: a value's kind"
+    },
+    "and" : {
+      "comment" : "Predicate builder: between one value and another"
     },
     "array" : {
 
     },
+    "begins with" : {
+      "comment" : "Predicate builder operator: BEGINSWITH"
+    },
+    "builder.quantifier.all" : {
+      "comment" : "Predicate builder quantifier: ALL of a to-many relationship",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "all"
+          }
+        }
+      }
+    },
+    "builder.quantifier.any" : {
+      "comment" : "Predicate builder quantifier: ANY of a to-many relationship",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "any"
+          }
+        }
+      }
+    },
+    "builder.quantifier.none" : {
+      "comment" : "Predicate builder quantifier: NONE of a to-many relationship",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "none"
+          }
+        }
+      }
+    },
     "changed to %@" : {
       "comment" : "Spoken for a changed field"
+    },
+    "contains" : {
+      "comment" : "Predicate builder operator: CONTAINS"
     },
     "default %@" : {
 
@@ -1091,13 +1278,79 @@
     "empty" : {
       "comment" : "Shown for a stored zero-length string"
     },
+    "ends with" : {
+      "comment" : "Predicate builder operator: ENDSWITH"
+    },
     "entered the filter" : {
       "comment" : "A row that now matches the saved filter"
     },
+    "exactly" : {
+      "comment" : "Predicate builder: no [cd] options"
+    },
     "false" : {
-
+      "comment" : "Predicate builder Boolean value"
+    },
+    "ignoring accents" : {
+      "comment" : "Predicate builder: [d]"
+    },
+    "ignoring case" : {
+      "comment" : "Predicate builder: [c]"
+    },
+    "ignoring case and accents" : {
+      "comment" : "Predicate builder: [cd]"
+    },
+    "is" : {
+      "comment" : "Predicate builder operator: =="
+    },
+    "is after" : {
+      "comment" : "Predicate builder operator: > on a date"
+    },
+    "is at least" : {
+      "comment" : "Predicate builder operator: >="
+    },
+    "is at most" : {
+      "comment" : "Predicate builder operator: <="
+    },
+    "is before" : {
+      "comment" : "Predicate builder operator: < on a date"
+    },
+    "is between" : {
+      "comment" : "Predicate builder operator: BETWEEN"
+    },
+    "is greater than" : {
+      "comment" : "Predicate builder operator: >"
+    },
+    "is less than" : {
+      "comment" : "Predicate builder operator: <"
+    },
+    "is like" : {
+      "comment" : "Predicate builder operator: LIKE (wildcards)"
+    },
+    "is nil" : {
+      "comment" : "Predicate builder operator"
+    },
+    "is not" : {
+      "comment" : "Predicate builder operator: !="
+    },
+    "is not nil" : {
+      "comment" : "Predicate builder operator"
+    },
+    "is on or after" : {
+      "comment" : "Predicate builder operator: >= on a date"
+    },
+    "is on or before" : {
+      "comment" : "Predicate builder operator: <= on a date"
+    },
+    "is one of" : {
+      "comment" : "Predicate builder operator: IN"
     },
     "it has no save counter, so updates cannot be told apart; inserts and deletes are exact" : {
+
+    },
+    "its history does not account for every change found, so some have no author" : {
+
+    },
+    "its persistent history could not be read, so changes arrive without an author" : {
 
     },
     "its rows cannot be attributed to an entity" : {
@@ -1111,6 +1364,9 @@
     },
     "left the filter" : {
 
+    },
+    "matches" : {
+      "comment" : "Predicate builder operator: MATCHES (a regular expression)"
     },
     "nil" : {
 
@@ -1145,17 +1401,29 @@
     "some rows belong to an entity this model does not describe" : {
 
     },
+    "text" : {
+      "comment" : "Fetch request prompt: a value's kind"
+    },
     "transient" : {
 
     },
     "true" : {
-
+      "comment" : "Predicate builder Boolean value"
+    },
+    "two of %@, separated by a comma" : {
+      "comment" : "Fetch request prompt"
     },
     "unlimited" : {
 
     },
     "untyped" : {
 
+    },
+    "x-coredata://…" : {
+      "comment" : "Placeholder of a URI field"
+    },
+    "yes or no" : {
+      "comment" : "Fetch request prompt: a value's kind"
     },
     "—" : {
 

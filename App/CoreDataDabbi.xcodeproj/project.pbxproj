@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		DA00000000000000000000A1 /* DabbiKit in Frameworks */ = {isa = PBXBuildFile; productRef = DA00000000000000000000A2 /* DabbiKit */; };
 		DA00000000000000000000A4 /* FixtureKit in Frameworks */ = {isa = PBXBuildFile; productRef = DA00000000000000000000A5 /* FixtureKit */; };
+		DA00000000000000000000A6 /* FixtureKit in Frameworks */ = {isa = PBXBuildFile; productRef = DA00000000000000000000A7 /* FixtureKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -24,11 +25,13 @@
 /* Begin PBXFileReference section */
 		DA0000000000000000000011 /* CoreDataDabbi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CoreDataDabbi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA0000000000000000000021 /* CoreDataDabbiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CoreDataDabbiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA0000000000000000000051 /* WriterApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WriterApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA0000000000000000000031 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		DA0000000000000000000032 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		DA0000000000000000000033 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		DA0000000000000000000034 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
 		DA0000000000000000000035 /* Tests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Tests.xcconfig; sourceTree = "<group>"; };
+		DA0000000000000000000036 /* WriterApp.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = WriterApp.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -55,6 +58,12 @@
 			path = CoreDataDabbiTests;
 			sourceTree = "<group>";
 		};
+		DA0000000000000000000044 /* WriterApp */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = WriterApp;
+			path = ../Tools/Writer/iOS;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +83,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA0000000000000000000053 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA00000000000000000000A6 /* FixtureKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -82,6 +99,7 @@
 			children = (
 				DA0000000000000000000042 /* CoreDataDabbi */,
 				DA0000000000000000000043 /* CoreDataDabbiTests */,
+				DA0000000000000000000044 /* WriterApp */,
 				DA0000000000000000000003 /* Config */,
 				DA0000000000000000000004 /* Products */,
 			);
@@ -95,6 +113,7 @@
 				DA0000000000000000000033 /* Release.xcconfig */,
 				DA0000000000000000000034 /* App.xcconfig */,
 				DA0000000000000000000035 /* Tests.xcconfig */,
+				DA0000000000000000000036 /* WriterApp.xcconfig */,
 			);
 			path = Config;
 			sourceTree = "<group>";
@@ -104,6 +123,7 @@
 			children = (
 				DA0000000000000000000011 /* CoreDataDabbi.app */,
 				DA0000000000000000000021 /* CoreDataDabbiTests.xctest */,
+				DA0000000000000000000051 /* WriterApp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -158,6 +178,29 @@
 			productReference = DA0000000000000000000021 /* CoreDataDabbiTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		DA0000000000000000000050 /* WriterApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA0000000000000000000055 /* Build configuration list for PBXNativeTarget "WriterApp" */;
+			buildPhases = (
+				DA0000000000000000000052 /* Sources */,
+				DA0000000000000000000053 /* Frameworks */,
+				DA0000000000000000000054 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA0000000000000000000044 /* WriterApp */,
+			);
+			name = WriterApp;
+			packageProductDependencies = (
+				DA00000000000000000000A7 /* FixtureKit */,
+			);
+			productName = WriterApp;
+			productReference = DA0000000000000000000051 /* WriterApp.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -174,6 +217,9 @@
 					DA0000000000000000000020 = {
 						CreatedOnToolsVersion = 26.4;
 						TestTargetID = DA0000000000000000000010;
+					};
+					DA0000000000000000000050 = {
+						CreatedOnToolsVersion = 26.4;
 					};
 				};
 			};
@@ -196,6 +242,7 @@
 			targets = (
 				DA0000000000000000000010 /* CoreDataDabbi */,
 				DA0000000000000000000020 /* CoreDataDabbiTests */,
+				DA0000000000000000000050 /* WriterApp */,
 			);
 		};
 /* End PBXProject section */
@@ -215,6 +262,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA0000000000000000000054 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -226,6 +280,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DA0000000000000000000022 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA0000000000000000000052 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -285,6 +346,20 @@
 			};
 			name = Release;
 		};
+		DA0000000000000000000056 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000036 /* WriterApp.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		DA0000000000000000000057 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = DA0000000000000000000036 /* WriterApp.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -315,6 +390,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		DA0000000000000000000055 /* Build configuration list for PBXNativeTarget "WriterApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA0000000000000000000056 /* Debug */,
+				DA0000000000000000000057 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -330,6 +414,10 @@
 			productName = DabbiKit;
 		};
 		DA00000000000000000000A5 /* FixtureKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FixtureKit;
+		};
+		DA00000000000000000000A7 /* FixtureKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FixtureKit;
 		};

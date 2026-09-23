@@ -317,6 +317,12 @@ final class TrackingFooterView: NSView {
         case .noEntityColumn: String(localized: "its rows cannot be attributed to an entity")
         case .unmappedEntityNumber: String(localized: "some rows belong to an entity this model does not describe")
         case .unverifiedJoinTable: String(localized: "a relationship's join table could not be confirmed")
+        // Both of these cost the author and the save time and nothing else: which rows changed is the scan's
+        // answer, not history's (TRK-10), so the diff above the tooltip is as exact as ever.
+        case .historyUnavailable:
+            String(localized: "its persistent history could not be read, so changes arrive without an author")
+        case .historyIncomplete:
+            String(localized: "its history does not account for every change found, so some have no author")
         }
     }
 }

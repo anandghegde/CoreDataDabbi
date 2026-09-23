@@ -67,6 +67,15 @@ import Testing
         #expect(ast.builderObstacles[0].text.contains("lowercase"))
     }
 
+    /// What an obstacle quotes is what was typed, not Foundation's `FUNCTION(…, "valueForKeyPath:", …)`.
+    @Test func obstaclesQuoteSubqueriesAsTheyAreWritten() throws {
+        let ast = try PredicateAST.parse(
+            "SUBQUERY(books, $b, $b.pages > 3 AND $b.title BEGINSWITH[c] \"a\").@count > 0")
+        #expect(
+            ast.builderObstacles.map(\.text)
+                == [#"SUBQUERY(books, $b, ($b.pages > 3) AND ($b.title BEGINSWITH[c] "a")).@count"#])
+    }
+
     /// An operator with no swapped form is left alone, because turning it around would ask a different
     /// question. The builder reports it instead.
     @Test func asymmetricOperatorsAreNeverTurnedAround() throws {

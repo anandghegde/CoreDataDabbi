@@ -290,13 +290,13 @@ Also here: **model diff** (two `ModelDescription`s → added/removed/changed ent
 
 ### 6.5 `DabbiQuery` — predicates and search
 
-- **One source of truth: `PredicateAST`** (Codable). Text → `NSPredicate(format:argumentArray:)` inside the exception bridge → walk `NSCompoundPredicate`/`NSComparisonPredicate`/`NSExpression` → AST. Builder edits produce AST directly. AST → `NSPredicate` for execution.
+- **One source of truth: `PredicateAST`** (Codable). Text → `NSPredicate(format:argumentArray:)` inside the exception bridge → walk `NSCompoundPredicate`/`NSComparisonPredicate`/`NSExpression` → AST. Builder edits come back from `NSPredicateEditor` as an `NSPredicate` and take the same walk to an AST, which is written into the text field (amended in M2-03: the editor has no API that yields anything else). AST → `NSPredicate` for execution.
 - **Validation before execution:** every key path in the AST is resolved against `ModelDescription` (through relationships, composite elements, `@count`, quantifiers). Unknown paths become diagnostics, not exceptions — this is also PRD-5 (saved predicates vs a changed model → warning badge + missing key paths).
-- **Round-trip (§7.1):** `isBuilderRepresentable(ast)` decides whether the visual builder can show it; otherwise the builder shows a single read-only "custom expression" row and the text field stays authoritative.
+- **Round-trip (§7.1):** `BuilderSchema.presentation(of:)` decides whether the visual builder can show it — `isBuilderRepresentable(ast)` for the shape, then a row for every comparison against the model — and hands the editor only normalised shapes: the root is a group, a negation is a None group, `TRUEPREDICATE` is an empty group. `NSPredicateEditor` raises on anything else, and an uncaught exception ends the app. Otherwise the builder shows why, in words, in place of the rows, and the text field stays authoritative (amended in M2-03: a line of reasons rather than a read-only row, since the editor has no row type that is read-only).
 - **Autocomplete:** tokenise up to the caret, resolve the partial key path in the model, offer attributes/relationships/operators/`[cd]` options.
 - **Code generation (PRD-4):** AST → format string · Swift `NSPredicate` · Objective-C · `#Predicate` (subset; unsupported operators are reported, not silently dropped) · full `NSFetchRequest`/`FetchDescriptor` with sorts.
-- **Fetch templates:** `fetchRequestFromTemplate(withName:substitutionVariables:)`, variables discovered from the AST and prompted with type-appropriate editors.
-- **Quick filter (PRD-6):** OR of `CONTAINS[cd]` over the entity's string attributes. **Global search (§7.9):** per-entity predicates chosen by the term's type (string/number/UUID), bounded parallelism, streamed results.
+- **Fetch templates:** variables discovered from the AST, typed by what each is compared with, and prompted with type-appropriate editors; the values are substituted into the AST, not through `fetchRequestFromTemplate(withName:substitutionVariables:)`, because the result must be text for the predicate bar and grid, and a cached model may lack its templates (PRJ-3).
+- **Quick filter (PRD-6):** OR of `CONTAINS[cd]` over the entity's string attributes (composite elements included, transients and relationships not), `AND`ed after whatever filter the grid already shows. The term is part of the browse location, not the project: it is never saved, and it scopes tracking as the filter does (amended in M2-13). **Global search (§7.9):** per-entity predicates chosen by the term's type (string/number/UUID), bounded parallelism, streamed results.
 - **In-memory evaluation** for tracking predicate views (TRK-7): `predicate.evaluate(with: managedObject)` in the `track` context, guarded.
 
 ### 6.6 `DabbiTracking` — change tracker
@@ -408,7 +408,7 @@ public struct ContentRegistry: Sendable {
   ```
   MyApp.dabbi/
   ├─ project.json        schemaVersion, storeLocation, modelReference, accessMode, display prefs
-  ├─ predicates/*.json   name, FetchSpec (format string + AST), column layout
+  ├─ predicates/*.json   one per predicate: name, entity, format string (no AST — §6.5), columns, sort
   ├─ diagrams/*.json     positions, hidden entities, style
   ├─ sql/*.sql           console snippets
   ├─ snapshots/index.json (+ optional payloads)
@@ -730,3 +730,14 @@ Two of these vary more than the rest, and for the same reason: the file cache. `
 | Tracking through a saved filter | A row that did not match and now does arrives marked *entered the filter*; rows outside it, and entities nobody asked about, produce no lines at all. |
 | Pausing over two commits | One batch on resume, carrying both changes and saying it stood for two commits. A log that quietly merged them would be a log nobody could check. |
 | The store replaced while the log is up | `storeWasReplaced`, the tracker dropped, the log emptied and the window asked to open the store again — the same act as the engine's stop, seen from the window. |
+
+**An app in an iOS simulator** (§11, M2-11), by `SimulatorWriterTests` — the writer app of `Tools/Writer/iOS` installed on a device and driven by `simctl`, with the tracker attached from this process. Off unless `DABBI_WRITER_APP` names a built `WriterApp.app`; `Scripts/e2e.sh` builds it and CI runs it.
+
+| Subject | Observed |
+|---|---|
+| A simulator container | An ordinary folder on the Mac, so the store an app writes is a file this process opens directly — no copy, no bridge, and `OpenedStore.isWorkingCopy` is false throughout. This is why the end-to-end test can be an ordinary test rather than a harness. |
+| Ten saves, 250 ms apart | Ten versions in the log, in the order the app made them, each with the values it wrote and none coalesced. The app's own account of what it did (`WriterScript.Report`, written to its `Documents`) and the `VersionLog` are compared line for line. |
+| Save to `ChangeBatch`, on a live app | Under the 500 ms budget of §6.6 for every batch, with the watcher's debounce turned down as the engine's own tests turn it down. |
+| A store watched through `pinned == YES` | Six of the ten saves cross the view's boundary and are the only ones reported. An insert of a row that already matches arrives `.entered`, and a delete of one that matched arrives `.left` — a view gains and loses objects whether or not their fields moved, and `nil` is kept for a change that happens inside the view. |
+| The writer app's bundle | Judged SwiftData by `SwiftDataConventions.shipsNoModel`, and the judgement is wrong: the writer builds its Core Data model in code, so it ships no `.mom`, which is the false positive that rule's own comment warns about. Nothing follows from it but a badge — the store opens, tracks and reads through the Core Data path regardless — and the test pins it so a later change to the heuristic has to say so. |
+| Tracking a running app's store for the length of a run | Not one file added to the app's `Library/Application Support`, during or after. The `-wal` and `-shm` move because the app is writing; nothing new appears beside them. |

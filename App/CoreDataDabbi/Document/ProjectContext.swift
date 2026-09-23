@@ -58,8 +58,11 @@ final class ProjectContext {
     @ObservationIgnored private var countsTask: Task<Void, Never>?
     @ObservationIgnored private var originTask: Task<Void, Never>?
     @ObservationIgnored private var attempt = 0
-    /// The entity tracking was on when the store was reopened, so it can be picked up again on the new session.
-    @ObservationIgnored private var resumeTracking: String?
+    /// Tracking was on when the store was reopened, so it can be picked up again on the new session.
+    @ObservationIgnored private var resumeTracking: Bool = false
+    /// What each fetch-request template was last run with, by name, for the prompt to start from. This window's
+    /// only: the values are the user's rows, and the project file is not the place for them.
+    @ObservationIgnored private var fetchRequestValues: [String: [String: PredicateLiteral]] = [:]
 
     init(package: ProjectPackage = ProjectPackage()) {
         self.package = package
@@ -81,6 +84,8 @@ final class ProjectContext {
     var storeURL: URL? { openedStore?.storeURL }
     /// The entity the main grid shows.
     var selectedEntity: String? { navigation.current?.entity }
+    /// The saved predicate the main grid shows its entity through, if it does.
+    var shownPredicate: SavedPredicate? { navigation.current?.savedPredicate.flatMap(savedPredicate(_:)) }
     var model: ModelDescription? { session?.info.model }
     var timeZone: TimeZone { project.display.timeZone.timeZone }
 
@@ -101,6 +106,10 @@ final class ProjectContext {
     func replace(_ package: ProjectPackage) {
         let pointsElsewhere = package.project.store != project.store || package.project.model != project.model
         self.package = package
+        // A saved predicate the other version does not have leaves its entity on screen, unfiltered by it.
+        if let id = navigation.current?.savedPredicate, savedPredicate(id) == nil {
+            navigation.amend { $0.savedPredicate = nil }
+        }
         if pointsElsewhere, hasStarted { openStore() }
     }
 
@@ -140,6 +149,93 @@ final class ProjectContext {
         project.display.entities[entity] ?? EntityLayout()
     }
 
+    /// The layout the grid is seen through at a place: the saved predicate's when it shows one, the entity's
+    /// otherwise (BRW-3). The display attribute is the entity's either way — it is how its objects are named.
+    func layout(at location: BrowseLocation) -> EntityLayout {
+        if let run = location.fetchRequest {
+            var layout = layout(of: location.entity)
+            layout.filter = run.filter
+            if !run.sort.isEmpty { layout.sort = run.sort }
+            return layout
+        }
+        guard let predicate = location.savedPredicate.flatMap(savedPredicate(_:)) else {
+            return layout(of: location.entity)
+        }
+        var layout = predicate.layout
+        layout.displayAttribute = self.layout(of: location.entity).displayAttribute
+        return layout
+    }
+
+    /// The layout of what the main grid shows. Empty when it shows nothing.
+    var shownLayout: EntityLayout {
+        navigation.current.map(layout(at:)) ?? EntityLayout()
+    }
+
+    /// Changes the columns, sort or filter of what the main grid shows — a saved predicate's own, when it is one.
+    ///
+    /// A saved predicate's filter is what it *is*, so changing it is an edit to the project the user is asked
+    /// about on closing; its columns and sort are how it is looked at, and are saved along like an entity's.
+    func updateShownLayout(_ update: (inout EntityLayout) -> Void) {
+        guard let location = navigation.current else { return }
+        if var run = location.fetchRequest {
+            // The run's filter and sort are its own; the columns it is seen through are the entity's.
+            var layout = layout(at: location)
+            update(&layout)
+            updateLayout(of: location.entity) {
+                $0.columns = layout.columns
+                $0.displayAttribute = layout.displayAttribute
+            }
+            run.filter = layout.filter
+            run.sort = layout.sort
+            if run != location.fetchRequest { navigation.amend { $0.fetchRequest = run } }
+            return
+        }
+        guard let id = location.savedPredicate, var predicate = savedPredicate(id) else {
+            updateLayout(of: location.entity, update)
+            return
+        }
+        var layout = predicate.layout
+        update(&layout)
+        guard layout != predicate.layout else { return }
+        let filterChanged = layout.filter != predicate.predicate
+        predicate.layout = layout
+        replaceSavedPredicate(predicate, as: filterChanged ? .project : .layout)
+    }
+
+    /// Filters what the main grid shows (§7.1): the entity, or the saved predicate it is seen through.
+    func setShownFilter(_ filter: PredicateSource?) {
+        updateShownLayout { $0.filter = filter }
+    }
+
+    // MARK: The quick filter (PRD-6)
+
+    /// What the quick filter can search at a place: `nil` without a model, or for an entity it does not have.
+    func quickFilter(at location: BrowseLocation) -> QuickFilter? {
+        model.flatMap { QuickFilter(model: $0, entity: location.entity) }
+    }
+
+    /// The quick filter for what the main grid shows.
+    var shownQuickFilter: QuickFilter? { navigation.current.flatMap(quickFilter(at:)) }
+
+    /// What the grid fetches at a place, and what tracking is scoped by: the place's filter, narrowed by what is
+    /// typed in its quick filter. The predicate bar still shows the filter alone — the quick filter is a search
+    /// within it, not an edit to it.
+    func fetchFilter(at location: BrowseLocation) -> PredicateSource? {
+        let filter = layout(at: location).filter
+        guard let quick = quickFilter(at: location) else { return filter }
+        return quick.narrowing(filter, by: location.quickFilter)
+    }
+
+    /// What the main grid fetches.
+    var shownFetchFilter: PredicateSource? { navigation.current.flatMap(fetchFilter(at:)) }
+
+    /// Searches the rows the main grid shows for a term, or — when it is empty — stops searching them. The same
+    /// place, seen through a search: nothing to go back to, and nothing the project keeps.
+    func setQuickFilter(_ term: String) {
+        guard let location = navigation.current, location.quickFilter != term else { return }
+        navigation.amend { $0.quickFilter = term }
+    }
+
     func updateWindow(_ update: (inout WindowState) -> Void) {
         var window = package.local.window
         update(&window)
@@ -159,6 +255,12 @@ final class ProjectContext {
     /// Shows an entity from its first row, as a click in the sidebar does.
     func select(entity: String) {
         show(BrowseLocation(entity: entity))
+    }
+
+    /// Shows a saved predicate's rows, as a click on it in the sidebar does (PRD-3).
+    func show(savedPredicate id: UUID) {
+        guard let predicate = savedPredicate(id) else { return }
+        show(BrowseLocation(entity: predicate.entity, savedPredicate: id))
     }
 
     func show(_ location: BrowseLocation) {
@@ -234,6 +336,126 @@ final class ProjectContext {
         updateSelection { $0.entity = navigation.current?.entity }
     }
 
+    // MARK: Fetch-request templates (BRW-1)
+
+    /// The model's templates, each read against it, by name.
+    var fetchRequestPlans: [FetchTemplatePlan] {
+        guard let model else { return [] }
+        return model.fetchRequestTemplates.map { FetchTemplatePlan(template: $0, model: model) }
+    }
+
+    /// The template the main grid shows its entity through, if it does.
+    var shownFetchRequest: FetchRequestRun? { navigation.current?.fetchRequest }
+
+    /// What a template's prompt starts from: the values it was last run with in this window.
+    func lastValues(forFetchRequest name: String) -> [String: PredicateLiteral] {
+        fetchRequestValues[name] ?? [:]
+    }
+
+    /// Runs a template with values for its variables, and shows its entity through the result (BRW-1).
+    ///
+    /// - Throws: ``DabbiError`` when the template cannot run, or a value is missing or of the wrong kind.
+    func run(fetchRequest plan: FetchTemplatePlan, values: [String: PredicateLiteral] = [:]) throws {
+        let filter = try plan.predicate(with: values)
+        guard let entity = plan.entity else { return }
+        let used = values.filter { name, _ in plan.variables.contains { $0.name == name } }
+        if !used.isEmpty { fetchRequestValues[plan.name] = used }
+        show(
+            BrowseLocation(
+                entity: entity,
+                fetchRequest: FetchRequestRun(
+                    name: plan.name, values: used, filter: filter, sort: plan.sort, limit: plan.limit)))
+    }
+
+    // MARK: Saved predicates (PRD-3, PRD-5)
+
+    /// By name, as the sidebar lists them.
+    var savedPredicates: [SavedPredicate] {
+        package.predicates.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    func savedPredicate(_ id: UUID) -> SavedPredicate? {
+        package.predicates.first { $0.id == id }
+    }
+
+    /// Whether a saved predicate still fits the model the store was opened with (PRD-5). Without a model there
+    /// is nothing to hold it against, and it is taken to be fine.
+    func check(_ predicate: SavedPredicate) -> SavedPredicateCheck {
+        guard let model else { return .fine }
+        return PredicateValidator(model: model).check(
+            entity: predicate.entity, predicate: predicate.predicate, sort: predicate.sort)
+    }
+
+    /// Whether ``saveShownPredicate()`` has something to save: an entity seen through its own layout, or through
+    /// a fetch-request template it was run with.
+    var canSavePredicate: Bool {
+        guard let location = navigation.current else { return false }
+        return location.savedPredicate == nil && model?.entity(named: location.entity) != nil
+    }
+
+    /// Keeps what the grid shows as a saved predicate, and goes to it (PRD-3).
+    ///
+    /// It takes the entity's filter, columns and sort with it, and the entity's own filter is cleared: the rows
+    /// the user filtered their way to are the predicate's now, and the entity is back to all of its rows. The
+    /// name is the first condition's, until the user gives it another. A template's run is kept the same way,
+    /// under the template's name, with its values in it; the entity's own filter was never involved.
+    ///
+    /// - Returns: the new predicate, for the sidebar to start renaming.
+    @discardableResult
+    func saveShownPredicate() -> SavedPredicate? {
+        guard canSavePredicate, let location = navigation.current else { return nil }
+        let entity = location.entity
+        let layout = layout(at: location)
+        let name = SavedPredicate.uniqueName(
+            location.fetchRequest?.name ?? SavedPredicateNaming.defaultName(for: layout.filter, entity: entity),
+            among: package.predicates.map(\.name))
+        let predicate = SavedPredicate(
+            name: name, entity: entity, predicate: layout.filter, columns: layout.columns, sort: layout.sort)
+        package.predicates.append(predicate)
+        if location.fetchRequest == nil { updateLayout(of: entity) { $0.filter = nil } }
+        onChange?(.project)
+        show(BrowseLocation(entity: entity, savedPredicate: predicate.id))
+        return predicate
+    }
+
+    /// A copy under the next free name, shown as the original is left alone.
+    @discardableResult
+    func duplicate(savedPredicate id: UUID) -> SavedPredicate? {
+        guard var copy = savedPredicate(id) else { return nil }
+        copy.id = UUID()
+        copy.name = SavedPredicate.uniqueName(copy.name, among: package.predicates.map(\.name))
+        package.predicates.append(copy)
+        onChange?(.project)
+        show(savedPredicate: copy.id)
+        return copy
+    }
+
+    /// Renames a saved predicate. An empty name is not one; a taken one gets a number.
+    func rename(savedPredicate id: UUID, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, var predicate = savedPredicate(id), predicate.name != name else { return }
+        predicate.name = SavedPredicate.uniqueName(
+            name, among: package.predicates.filter { $0.id != id }.map(\.name))
+        replaceSavedPredicate(predicate, as: .project)
+    }
+
+    /// Deletes a saved predicate. Were its rows on screen, the grid goes back to its entity.
+    func delete(savedPredicate id: UUID) {
+        guard package.predicates.contains(where: { $0.id == id }) else { return }
+        package.predicates.removeAll { $0.id == id }
+        onChange?(.project)
+        guard let location = navigation.current, location.savedPredicate == id else { return }
+        show(BrowseLocation(entity: location.entity))
+    }
+
+    private func replaceSavedPredicate(_ predicate: SavedPredicate, as change: Change) {
+        guard let index = package.predicates.firstIndex(where: { $0.id == predicate.id }),
+            package.predicates[index] != predicate
+        else { return }
+        package.predicates[index] = predicate
+        onChange?(change)
+    }
+
     // MARK: The store
 
     @ObservationIgnored private var hasStarted = false
@@ -255,7 +477,7 @@ final class ProjectContext {
         let previous = openedStore
         entityCounts = [:]
         // Keys, prior values and materialised objects all belong to the session that is about to close.
-        resumeTracking = tracking.isRunning ? tracking.entity : nil
+        resumeTracking = tracking.isRunning
         tracking.close()
 
         guard let location = project.store else {
@@ -311,10 +533,11 @@ final class ProjectContext {
             // A related object picked before the reload belongs to the session that has just gone.
             inspect(navigation.current?.focus)
             loadCounts(of: store.session)
-            if let entity = resumeTracking, model.entity(named: entity) != nil {
-                tracking.start(on: store.session, entity: entity, filter: layout(of: entity).filter)
+            // Tracking follows the grid, so it starts again on what the grid is showing now (TRK-7).
+            if resumeTracking, let location = navigation.current, model.entity(named: location.entity) != nil {
+                tracking.start(on: store.session, entity: location.entity, filter: fetchFilter(at: location))
             }
-            resumeTracking = nil
+            resumeTracking = false
         }
     }
 
@@ -356,7 +579,7 @@ final class ProjectContext {
         await openTask?.value
         await countsTask?.value
         await originTask?.value
-        await tracking.whenStarted()
+        await tracking.whenSettled()
     }
 
     /// The document is closing.

@@ -72,6 +72,13 @@ public struct BuilderObstacle: Sendable, Hashable, Codable {
         case noRowForm
         /// Text the parser kept verbatim.
         case unparsedText
+        /// The key path is not one the model has, or not one a row can start with — a to-many relationship on
+        /// its own, a fetched property.
+        case keyPathNotOffered
+        /// A key path through a to-many relationship with no `ANY` or `ALL` in front of it.
+        case needsQuantifier
+        /// The row exists, but not with this operator, these options or this kind of value.
+        case noEditorForRow
     }
 
     public var reason: Reason
@@ -88,6 +95,12 @@ public struct BuilderObstacle: Sendable, Hashable, Codable {
             "“\(text)” has no row in the builder."
         case .unparsedText:
             "“\(text)” is kept as text."
+        case .keyPathNotOffered:
+            "“\(text)” does not start with a key path the builder offers for this entity."
+        case .needsQuantifier:
+            "“\(text)” goes through a to-many relationship without ANY or ALL, so the builder has no row for it."
+        case .noEditorForRow:
+            "“\(text)” compares in a way the builder has no editor for."
         }
     }
 }
@@ -106,13 +119,53 @@ extension PredicateExpression {
     var isBuilderRightSide: Bool {
         switch self {
         case .constant, .variable: true
-        case .aggregate(let elements): elements.allSatisfy { if case .constant = $0 { true } else { false } }
+        case .aggregate(let elements):
+            // `BETWEEN {$LOW, $HIGH}` is a template's range: each end is typed or filled in, like a single value.
+            elements.allSatisfy {
+                switch $0 {
+                case .constant, .variable: true
+                default: false
+                }
+            }
         case .keyPath, .object, .function, .subquery, .keyPathOn, .custom: false
         }
     }
 
     /// How the expression is written, for a diagnostic. Falls back to a description when it will not build.
+    ///
+    /// Foundation prints `$e.age` as `FUNCTION($e, "valueForKeyPath:", age)`, which is not what anybody typed,
+    /// so a key path read off another expression, and a subquery that has some inside it, are written here.
     var text: String {
-        (try? makeExpression().description) ?? String(describing: self)
+        switch self {
+        case .keyPathOn(let base, let keyPath):
+            "\(base.text).\(keyPath)"
+        case .subquery(let collection, let variable, let predicate):
+            "SUBQUERY(\(collection.text), $\(variable), \(predicate.text))"
+        default:
+            (try? makeExpression().description) ?? String(describing: self)
+        }
+    }
+}
+
+extension PredicateAST {
+    /// How a subquery's predicate is written, for a diagnostic: comparisons by hand, so that their sides go
+    /// through ``PredicateExpression/text``, and anything else as Foundation formats it.
+    var text: String {
+        switch self {
+        case .comparison(let comparison):
+            [
+                comparison.modifier.keyword, comparison.left.text, comparison.op.keyword + comparison.options.suffix,
+                comparison.right.text,
+            ]
+            .compactMap { $0 }.joined(separator: " ")
+        case .and(let subs):
+            subs.map { "(\($0.text))" }.joined(separator: " AND ")
+        case .or(let subs):
+            subs.map { "(\($0.text))" }.joined(separator: " OR ")
+        case .not(let sub):
+            "NOT (\(sub.text))"
+        case .all, .none, .custom:
+            (try? formatString()) ?? String(describing: self)
+        }
     }
 }

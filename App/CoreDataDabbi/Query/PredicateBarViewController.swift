@@ -5,9 +5,11 @@ import DabbiKit
 ///
 /// A monospaced field, a line underneath that says what is wrong with what is in it, and a completion list
 /// driven by the model. Return applies; Escape puts the applied predicate back, or hands the keyboard to the
-/// rows when there is nothing to put back. Nothing is fetched until it is applied.
+/// rows when there is nothing to put back. Nothing is fetched until it is applied. The builder under it
+/// (M2-03) is another way of writing the same text. The search field at its end is the quick filter (PRD-6): a
+/// term looked for in the rows the predicate leaves, as it is typed, and never saved.
 @MainActor
-final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
+final class PredicateBarViewController: NSViewController, NSSearchFieldDelegate {
     let context: ProjectContext
     let model: PredicateBarModel
 
@@ -18,6 +20,9 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
     let field = PredicateTextField()
     private let icon = NSImageView()
     private let clearButton = NSButton()
+    private let builderButton = NSButton()
+    let searchField = NSSearchField()
+    let builder: PredicateBuilderViewController
     private let message = NSTextField(labelWithString: "")
     private var messageRow: NSStackView!
     private var loop: ObservationLoop?
@@ -29,6 +34,7 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
     init(context: ProjectContext) {
         self.context = context
         model = PredicateBarModel(context: context)
+        builder = PredicateBuilderViewController(model: model)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -75,7 +81,32 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
         message.lineBreakMode = .byTruncatingTail
         message.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        let row = NSStackView(views: [icon, field, clearButton])
+        builderButton.image = NSImage(
+            systemSymbolName: "slider.horizontal.3",
+            accessibilityDescription: String(localized: "Show Predicate Builder"))
+        builderButton.setButtonType(.pushOnPushOff)
+        builderButton.bezelStyle = .toolbar
+        builderButton.isBordered = false
+        builderButton.imagePosition = .imageOnly
+        builderButton.target = self
+        builderButton.action = #selector(toggleBuilder(_:))
+        builderButton.setContentHuggingPriority(.required, for: .horizontal)
+
+        searchField.controlSize = .small
+        searchField.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        searchField.sendsWholeSearchString = false
+        searchField.sendsSearchStringImmediately = false
+        searchField.target = self
+        searchField.action = #selector(search(_:))
+        searchField.delegate = self
+        searchField.setAccessibilityLabel(String(localized: "Search Rows"))
+        searchField.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        searchField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let searchWidth = searchField.widthAnchor.constraint(equalToConstant: 180)
+        searchWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([searchWidth, searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 90)])
+
+        let row = NSStackView(views: [icon, field, clearButton, builderButton, searchField])
         row.spacing = 6
         row.alignment = .centerY
 
@@ -88,7 +119,10 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
         messageRow.alignment = .centerY
         messageRow.isHidden = true
 
-        let column = NSStackView(views: [row, messageRow])
+        addChild(builder)
+        builder.view.isHidden = true
+
+        let column = NSStackView(views: [row, messageRow, builder.view])
         column.orientation = .vertical
         column.alignment = .leading
         column.spacing = 4
@@ -109,6 +143,7 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
             // A vertical stack leaves its rows their natural width; these two are meant to fill it.
             row.widthAnchor.constraint(equalTo: column.widthAnchor, constant: -20),
             messageRow.widthAnchor.constraint(equalTo: column.widthAnchor, constant: -20),
+            builder.view.widthAnchor.constraint(equalTo: column.widthAnchor, constant: -20),
             separator.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             separator.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -133,6 +168,40 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
         clearButton.isHidden = text.isEmpty
         icon.contentTintColor = model.isFiltering ? .controlAccentColor : .secondaryLabelColor
         show(model.message, isError: model.isShowingError)
+
+        let isShowingBuilder = model.isShowingBuilder
+        builder.view.isHidden = !isShowingBuilder
+        builderButton.state = isShowingBuilder ? .on : .off
+        builderButton.contentTintColor = isShowingBuilder ? .controlAccentColor : .secondaryLabelColor
+        let title =
+            isShowingBuilder
+            ? String(localized: "Hide Predicate Builder") : String(localized: "Show Predicate Builder")
+        builderButton.toolTip = title
+        builderButton.setAccessibilityLabel(title)
+        if isShowingBuilder { builder.follow() }
+
+        followQuickFilter()
+    }
+
+    /// The search field says what is searched for where the grid is, and in what: going Back brings a search
+    /// back with its place, and an entity with nothing to search in has nothing to type into (PRD-6).
+    private func followQuickFilter() {
+        let term = context.navigation.current?.quickFilter ?? ""
+        if searchField.stringValue != term { searchField.stringValue = term }
+        let quick = context.shownQuickFilter
+        let isSearchable = quick?.isSearchable ?? false
+        searchField.isEnabled = isSearchable
+        searchField.placeholderString =
+            isSearchable || quick == nil
+            ? String(localized: "Search", comment: "Placeholder of the quick filter field")
+            : String(localized: "No text to search", comment: "Placeholder of the quick filter field, disabled")
+        searchField.toolTip = quick.flatMap { quick in
+            quick.isSearchable
+                ? String(
+                    localized: "Shows the rows with the text in \(quick.keyPaths.joined(separator: ", "))",
+                    comment: "Tooltip of the quick filter field; the list is of attribute names")
+                : nil
+        }
     }
 
     private func show(_ text: String?, isError: Bool) {
@@ -146,7 +215,7 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
     // MARK: What the user does
 
     func controlTextDidChange(_ notification: Notification) {
-        guard !isUpdating else { return }
+        guard !isUpdating, notification.object as? NSTextField === field else { return }
         let wasDeleting = isDeleting
         isDeleting = false
         model.text = field.stringValue
@@ -160,6 +229,33 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
         model.apply()
     }
 
+    /// The quick filter: sent a moment after typing stops, and at once on Return or the field's clear button.
+    @objc private func search(_ sender: NSSearchField) {
+        context.setQuickFilter(sender.stringValue)
+    }
+
+    /// Puts the keyboard in the quick filter, with what is there selected to be typed over (PRD-6).
+    @discardableResult
+    func focusQuickFilter() -> Bool {
+        guard searchField.isEnabled, let window = view.window, window.makeFirstResponder(searchField) else {
+            return false
+        }
+        searchField.currentEditor()?.selectAll(nil)
+        return true
+    }
+
+    /// Opens or closes the builder under the field (M2-03).
+    @IBAction func toggleBuilder(_ sender: Any?) {
+        model.isShowingBuilder.toggle()
+    }
+
+    /// "New Predicate": the builder with one row to type a value into, and the keyboard in it (PRD-3).
+    func startNewPredicate() {
+        let hasRow = model.startNewPredicate()
+        follow()
+        if !hasRow || !builder.focusFirstValue() { view.window?.makeFirstResponder(field) }
+    }
+
     @objc private func clear() {
         model.clear()
         view.window?.makeFirstResponder(field)
@@ -168,6 +264,7 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
     /// Return applies and keeps the keyboard, so the predicate can be refined against the rows it produced.
     /// Escape gives up the change, or leaves for the grid when there is no change to give up (§8.4).
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if control === searchField { return searchField(doCommandBy: selector) }
         isDeleting =
             selector == #selector(NSResponder.deleteBackward(_:))
             || selector == #selector(NSResponder.deleteForward(_:))
@@ -185,6 +282,19 @@ final class PredicateBarViewController: NSViewController, NSTextFieldDelegate {
         default:
             return false
         }
+    }
+
+    /// Escape empties the search, and leaves for the rows when there is nothing to empty — as the predicate field
+    /// does, so that it takes two presses at most to get back to the grid from either (§8.4).
+    private func searchField(doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        if searchField.stringValue.isEmpty {
+            onDone?()
+        } else {
+            searchField.stringValue = ""
+            context.setQuickFilter("")
+        }
+        return true
     }
 
     /// The completion list, from the model (M2-02).

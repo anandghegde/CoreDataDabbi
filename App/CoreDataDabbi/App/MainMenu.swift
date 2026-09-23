@@ -107,10 +107,25 @@ enum MainMenu {
         menu.addItem(.separator())
 
         // The predicate bar, where the rows on screen are narrowed down (§7.1). ⌥⌘F puts the keyboard in it
-        // from wherever the window is.
+        // from wherever the window is; ⌘F in the quick filter at its end, which is Find for a table (PRD-6).
+        menu.addItem(
+            item(String(localized: "Search Rows"), #selector(ProjectWindowController.focusQuickFilter(_:)), "f"))
         menu.addItem(
             item(
                 String(localized: "Filter Rows"), #selector(ProjectWindowController.focusFilter(_:)), "f",
+                [.command, .option]))
+        menu.addItem(
+            item(
+                String(localized: "Show Predicate Builder"),
+                #selector(ProjectWindowController.togglePredicateBuilder(_:)), "b", [.command, .option]))
+        // A predicate worth keeping is kept in the project, and listed in the sidebar (PRD-3).
+        menu.addItem(
+            item(
+                String(localized: "New Predicate"), #selector(ProjectWindowController.newPredicate(_:)), "n",
+                [.command, .option]))
+        menu.addItem(
+            item(
+                String(localized: "Save Predicate"), #selector(ProjectWindowController.savePredicate(_:)), "s",
                 [.command, .option]))
         menu.addItem(.separator())
 

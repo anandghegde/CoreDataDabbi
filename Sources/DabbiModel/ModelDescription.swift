@@ -225,6 +225,18 @@ public struct FetchRequestTemplate: Sendable, Hashable, Codable {
     public var fetchLimit: Int
     /// `$VARIABLE` names the predicate expects, without the `$`, sorted.
     public var substitutionVariables: [String]
+
+    public init(
+        name: String, entity: String?, predicateFormat: String?, sort: [SortKey] = [], fetchLimit: Int = 0,
+        substitutionVariables: [String] = []
+    ) {
+        self.name = name
+        self.entity = entity
+        self.predicateFormat = predicateFormat
+        self.sort = sort
+        self.fetchLimit = fetchLimit
+        self.substitutionVariables = substitutionVariables
+    }
 }
 
 extension Data {

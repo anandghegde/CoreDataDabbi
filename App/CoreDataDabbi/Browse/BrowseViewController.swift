@@ -110,11 +110,11 @@ final class BrowseViewController: NSViewController {
     }
 
     /// Starts, or re-scopes, tracking on the entity the window is showing, through the filter it is showing it
-    /// through (TRK-7).
+    /// through — the quick filter's search included (TRK-7, PRD-6).
     private func startTracking() {
         guard let store = context.session, let entity = context.selectedEntity else { return }
         context.tracking.start(
-            on: store, entity: entity, filter: context.layout(of: entity).filter,
+            on: store, entity: entity, filter: context.shownFetchFilter,
             // Handed over *after* the tracker has started, which is when it will keep them: the rows the user
             // is already looking at are the ones whose first change must read as before -> after (TRK-2).
             alreadyRead: { [weak self] in self?.grid.rows?.loadedPages() ?? [] })
@@ -129,7 +129,7 @@ final class BrowseViewController: NSViewController {
             session.close()
             return
         }
-        let filter = context.layout(of: entity).filter
+        let filter = context.shownFetchFilter
         guard entity != session.entity || filter != session.filter else { return }
         if session.isRunning {
             startTracking()

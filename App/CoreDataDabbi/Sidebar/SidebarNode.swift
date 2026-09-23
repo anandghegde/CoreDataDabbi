@@ -8,10 +8,13 @@ import Foundation
 @MainActor
 final class SidebarNode {
     enum Kind {
-        /// A heading: "Entities", "Fetch Requests". Never selectable.
+        /// A heading: "Entities", "Fetch Requests", "Saved Predicates". Never selectable.
         case group(String)
         case entity(EntityDescription)
-        case fetchRequest(FetchRequestTemplate)
+        /// A template of the model's, read against it: what it asks for, and whether it can run (BRW-1).
+        case fetchRequest(FetchTemplatePlan)
+        /// A predicate kept in the project, and what the model says of it now (PRD-3, PRD-5).
+        case savedPredicate(SavedPredicate, SavedPredicateCheck)
     }
 
     let kind: Kind
@@ -29,6 +32,28 @@ final class SidebarNode {
         if case .entity(let entity) = kind { entity.name } else { nil }
     }
 
+    /// The saved predicate this row stands for, if it stands for one.
+    var savedPredicateID: UUID? {
+        if case .savedPredicate(let predicate, _) = kind { predicate.id } else { nil }
+    }
+
+    /// The fetch-request template this row stands for, if it stands for one.
+    var fetchRequest: FetchTemplatePlan? {
+        if case .fetchRequest(let plan) = kind { plan } else { nil }
+    }
+
+    /// Whether clicking the row shows something: an entity, a template whose entity is there, or a saved
+    /// predicate whose entity is still there. One that no longer fits the model otherwise still opens — the
+    /// predicate bar says what is wrong with it.
+    var isSelectable: Bool {
+        switch kind {
+        case .entity: true
+        case .fetchRequest(let plan): plan.isRunnable
+        case .savedPredicate(_, let check): !check.isMissingEntity
+        case .group: false
+        }
+    }
+
     var isGroup: Bool {
         if case .group = kind { true } else { false }
     }
@@ -37,7 +62,8 @@ final class SidebarNode {
         switch kind {
         case .group(let title): title
         case .entity(let entity): entity.name
-        case .fetchRequest(let request): request.name
+        case .fetchRequest(let plan): plan.name
+        case .savedPredicate(let predicate, _): predicate.name
         }
     }
 
@@ -54,11 +80,14 @@ final class SidebarNode {
 
     // MARK: Building
 
-    /// The whole sidebar of a model: entities nested by inheritance, then the model's fetch requests.
+    /// The whole sidebar of a model: entities nested by inheritance, the model's fetch requests, then the
+    /// project's saved predicates, in the order they are given (§8.2).
     ///
     /// Entities are sorted by name within each level, the way a person looks for one — not in the order the
     /// model happens to list them.
-    static func tree(of model: ModelDescription) -> [SidebarNode] {
+    static func tree(
+        of model: ModelDescription, savedPredicates: [(SavedPredicate, SavedPredicateCheck)] = []
+    ) -> [SidebarNode] {
         var groups: [SidebarNode] = []
         let entities = model.rootEntities.map { subtree(of: $0, in: model) }
         if !entities.isEmpty {
@@ -68,7 +97,15 @@ final class SidebarNode {
             groups.append(
                 SidebarNode(
                     .group(String(localized: "Fetch Requests")),
-                    children: model.fetchRequestTemplates.map { SidebarNode(.fetchRequest($0)) }))
+                    children: model.fetchRequestTemplates.map {
+                        SidebarNode(.fetchRequest(FetchTemplatePlan(template: $0, model: model)))
+                    }))
+        }
+        if !savedPredicates.isEmpty {
+            groups.append(
+                SidebarNode(
+                    .group(String(localized: "Saved Predicates")),
+                    children: savedPredicates.map { SidebarNode(.savedPredicate($0, $1)) }))
         }
         return groups
     }

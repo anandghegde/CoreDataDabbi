@@ -49,6 +49,9 @@ final class TrackingSession {
     @ObservationIgnored private var tracker: ChangeTracker?
     @ObservationIgnored private var startTask: Task<Void, Never>?
     @ObservationIgnored private var pump: Task<Void, Never>?
+    /// The last pause, resume or clear sent to the tracker. Each waits for the one before, so that the tracker
+    /// sees them in the order the user pressed the buttons — two bare tasks may reach an actor either way round.
+    @ObservationIgnored private var control: Task<Void, Never>?
     /// Bumped per run; anything that arrives from an earlier one is dropped.
     @ObservationIgnored private var generation = 0
 
@@ -137,13 +140,13 @@ final class TrackingSession {
     func pause() {
         guard state == .tracking, let tracker else { return }
         state = .paused
-        Task { await tracker.pause() }
+        send { await tracker.pause() }
     }
 
     func resume() {
         guard state == .paused, let tracker else { return }
         state = .tracking
-        Task { await tracker.resume() }
+        send { await tracker.resume() }
     }
 
     /// Folds an object's earlier versions away, or back out again (TRK-2).
@@ -157,7 +160,7 @@ final class TrackingSession {
         guard isShowingLog else { return }
         log.clear()
         revision += 1
-        if let tracker { Task { await tracker.versions.clear() } }
+        if let tracker { send { await tracker.versions.clear() } }
         if !isRunning { close() }
     }
 
@@ -192,19 +195,28 @@ final class TrackingSession {
         revision += 1
     }
 
+    private func send(_ operation: @escaping @MainActor () async -> Void) {
+        control = Task { [previous = control] in
+            await previous?.value
+            await operation()
+        }
+    }
+
     private func stopTracker() {
         generation += 1
         startTask?.cancel()
         startTask = nil
         pump?.cancel()
         pump = nil
-        if let tracker { Task { await tracker.stop() } }
+        if let tracker { send { await tracker.stop() } }
         tracker = nil
     }
 
-    /// Returns once the tracker has started, or failed to. Nothing in the app waits for that; the tests do.
-    func whenStarted() async {
+    /// Returns once the tracker has started, or failed to, and has been told of every pause, resume and clear
+    /// since. Nothing in the app waits for that; the tests do.
+    func whenSettled() async {
         await startTask?.value
+        await control?.value
     }
 
     /// The tracker's own account of what it is holding — the diagnostics pane's, and the tests'.

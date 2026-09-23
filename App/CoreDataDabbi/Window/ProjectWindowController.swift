@@ -53,7 +53,9 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
 
     private func showStatus() {
         capsule.status = StoreStatus(context: context)
-        window?.subtitle = context.selectedEntity ?? ""
+        // A saved predicate is named for what it shows; the entity is the predicate bar's to say (PRD-3).
+        window?.subtitle =
+            context.shownPredicate?.name ?? context.shownFetchRequest?.name ?? context.selectedEntity ?? ""
     }
 
     // MARK: Window state
@@ -120,6 +122,35 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
     /// Sends the keyboard to the predicate bar, which is where a filter is written (§7.1, §8.3).
     @IBAction func focusFilter(_ sender: Any?) { focus(pane: Pane.filter) }
 
+    /// Sends the keyboard to the quick filter at the end of the predicate bar (PRD-6).
+    @IBAction func focusQuickFilter(_ sender: Any?) {
+        guard panes.reveal(pane: Pane.filter) != nil else { return }
+        panes.view.layoutSubtreeIfNeeded()
+        panes.centre.browse.bar.focusQuickFilter()
+    }
+
+    /// Opens or closes the visual builder under the predicate field (M2-03).
+    @IBAction func togglePredicateBuilder(_ sender: Any?) {
+        panes.centre.browse.bar.toggleBuilder(sender)
+    }
+
+    /// Starts a predicate in the builder, on the entity's `name` or `title`, with the keyboard in its value
+    /// (PRD-3). It is saved with "Save Predicate" once it shows what it should.
+    @IBAction func newPredicate(_ sender: Any?) {
+        _ = panes.reveal(pane: Pane.filter)
+        panes.view.layoutSubtreeIfNeeded()
+        panes.centre.browse.bar.startNewPredicate()
+    }
+
+    /// Keeps the rows on screen — the entity's filter, columns and sort — as a saved predicate, and puts its
+    /// name into editing in the sidebar (PRD-3).
+    @IBAction func savePredicate(_ sender: Any?) {
+        guard let predicate = context.saveShownPredicate() else { return }
+        _ = panes.reveal(pane: Pane.sidebar)
+        panes.view.layoutSubtreeIfNeeded()
+        panes.sidebar.beginRenaming(savedPredicate: predicate.id)
+    }
+
     /// Returns what took the keyboard, for the tests.
     @discardableResult
     func focus(pane name: String) -> NSResponder? {
@@ -146,6 +177,17 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
             item.title =
                 isCollapsed ? String(localized: "Show Bottom Panel") : String(localized: "Hide Bottom Panel")
             return true
+        case #selector(togglePredicateBuilder(_:)):
+            item.title =
+                panes.centre.browse.bar.model.isShowingBuilder
+                ? String(localized: "Hide Predicate Builder") : String(localized: "Show Predicate Builder")
+            return context.selectedEntity != nil
+        case #selector(newPredicate(_:)):
+            return context.selectedEntity != nil && context.model != nil
+        case #selector(savePredicate(_:)):
+            return context.canSavePredicate
+        case #selector(focusQuickFilter(_:)):
+            return context.shownQuickFilter?.isSearchable ?? false
         case #selector(focusFilter(_:)):
             // There is nothing to filter until an entity is on screen.
             return context.selectedEntity != nil

@@ -12,7 +12,11 @@ import PackageDescription
 
 let package = Package(
     name: "CoreDataDabbi",
-    platforms: [.macOS(.v14)],
+    // iOS is here for one product only: `FixtureKit` is linked into the simulator writer app (M2-11,
+    // `Tools/Writer/iOS`), which is what proves the tracker end to end against a real app in a real container.
+    // That app is built by Xcode and excluded from the `Writer` target below, so nothing this package builds
+    // imports UIKit, and no part of the engine is built for iOS at all.
+    platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .library(name: "DabbiKit", targets: ["DabbiKit"]),
         .executable(name: "dabbi", targets: ["dabbi"]),
@@ -76,7 +80,11 @@ let package = Package(
                 "FixtureKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
-            path: "Tools/Writer"
+            path: "Tools/Writer",
+            // The writer's other half is an iOS app (M2-11) built by Xcode, which is the only thing with a
+            // simulator SDK to build it against. It sits here because it runs the same script; it is not part
+            // of this executable.
+            exclude: ["iOS"]
         ),
 
         // Mutation fuzzing of the content decoders (ARCHITECTURE.md §6.8). The kit is shared with the test suite,

@@ -7,6 +7,10 @@
 // M2-02 adds what a field needs to complete what is being typed (`PredicateCompleter`), which the app's
 // predicate bar drives.
 //
-// Still to come: the `NSPredicateEditor` templates (M2-03), saved predicates (M2-04), fetch-request templates
-// (M2-05), the quick filter (M2-13), code generation (M4-08) and global search (M5-05).
+// M2-03 adds the builder's schema: the key paths an `NSPredicateEditor` row can offer, and which predicates it
+// can show as rows (`BuilderSchema`). M2-04 checks a saved predicate against the model it is opened with, and
+// names a new one after its first condition (`SavedPredicateCheck`, `SavedPredicateNaming`).
+//
+// Still to come: fetch-request templates (M2-05), the quick filter (M2-13), code generation (M4-08) and global
+// search (M5-05).
 // See docs/ARCHITECTURE.md §6.5.

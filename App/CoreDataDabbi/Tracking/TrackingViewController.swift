@@ -88,7 +88,12 @@ final class TrackingViewController: NSViewController, NSTableViewDataSource, NST
 
     private func observe() {
         let entity = session.entity
-        let layout = entity.map { context.layout(of: $0) }
+        // Tracking follows the grid, so the log is seen through what the grid is: a saved predicate's columns
+        // when it shows one (BRW-3).
+        let layout = entity.map { entity in
+            context.navigation.current.flatMap { $0.entity == entity ? context.layout(at: $0) : nil }
+                ?? context.layout(of: entity)
+        }
         let revision = session.revision
         // Reading these here means a change to any of them redraws the log.
         _ = context.timeZone
@@ -171,7 +176,7 @@ final class TrackingViewController: NSViewController, NSTableViewDataSource, NST
 
     /// A width set here is the same column's width in the grid: it is the same column.
     func tableViewColumnDidResize(_ notification: Notification) {
-        guard !isUpdating, let entity = shownEntity,
+        guard !isUpdating, let entity = shownEntity, entity == context.selectedEntity,
             let tableColumn = notification.userInfo?["NSTableColumn"] as? NSTableColumn,
             let index = columns.firstIndex(where: { $0.property == tableColumn.identifier.rawValue }),
             case .grid(var grid) = columns[index]
@@ -183,7 +188,7 @@ final class TrackingViewController: NSViewController, NSTableViewDataSource, NST
             return grid
         }
         shownLayout?.columns = GridColumn.layout(of: saved)
-        context.updateLayout(of: entity) { $0.columns = GridColumn.layout(of: saved) }
+        context.updateShownLayout { $0.columns = GridColumn.layout(of: saved) }
     }
 
     // MARK: Rows
