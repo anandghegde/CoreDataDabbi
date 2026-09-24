@@ -91,6 +91,29 @@ import Testing
         #expect(people.items.contains { $0.ref == person })
     }
 
+    /// An item was a `ref` and a `display` until objects only inserted could be listed; that form still reads
+    /// and is still written for every saved object.
+    @Test func anItemKeepsTheFormItHadForSavedObjects() throws {
+        struct EarlierItem: Codable, Equatable {
+            var ref: ObjectRef
+            var display: String?
+        }
+        let uri = URL(string: "x-coredata://4B1D5E9A-0000-4000-8000-000000000001/Employee/p7")!
+        let ref = try #require(ObjectRef(uri: uri))
+        let item = RelatedObjects.Item(ref: ref, display: "Ada")
+
+        let written = try JSONEncoder().encode(item)
+        #expect(try JSONDecoder().decode(EarlierItem.self, from: written) == EarlierItem(ref: ref, display: "Ada"))
+        let earlier = try JSONEncoder().encode(EarlierItem(ref: ref, display: "Ada"))
+        #expect(try JSONDecoder().decode(RelatedObjects.Item.self, from: earlier) == item)
+
+        // One only inserted has no reference, and round-trips by the identity it was staged under.
+        let staged = PendingObjectID(uri: URL(string: "x-coredata:///Employee/t0A1B2C3D")!, entity: "Employee")
+        let inserted = RelatedObjects.Item(object: staged)
+        let decoded = try JSONDecoder().decode(RelatedObjects.Item.self, from: JSONEncoder().encode(inserted))
+        #expect(decoded == inserted && decoded.ref == nil)
+    }
+
     @Test func saysHowManyThereAreWhenItShowsFewer() async throws {
         let session = try await open(.company)
         defer { Task { await session.close() } }

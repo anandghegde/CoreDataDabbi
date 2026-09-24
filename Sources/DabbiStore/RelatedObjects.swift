@@ -27,6 +27,30 @@ public struct RelatedObjects: Sendable, Hashable, Codable {
 
         /// What to show for this object: its label, or its identity when it has none.
         public var label: String { display ?? object.description }
+
+        // The encoded form keeps `ref` next to `object`. Until objects only inserted could be listed, an item was
+        // a `ref` and a `display`: a reader of that form still reads every saved object, and a payload in it
+        // still decodes. An object only inserted has no `ref` for such a reader to find.
+        private enum CodingKeys: String, CodingKey {
+            case object, ref, display
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let object = try container.decodeIfPresent(PendingObjectID.self, forKey: .object) {
+                self.object = object
+            } else {
+                object = PendingObjectID(try container.decode(ObjectRef.self, forKey: .ref))
+            }
+            display = try container.decodeIfPresent(String.self, forKey: .display)
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(object, forKey: .object)
+            try container.encodeIfPresent(ref, forKey: .ref)
+            try container.encodeIfPresent(display, forKey: .display)
+        }
     }
 
     public var relationship: String
