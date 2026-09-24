@@ -142,6 +142,19 @@ private func page(_ range: Range<Int>, generation: Int = 0, missing: [Int] = [])
         await session.close()
     }
 
+    @Test func aHandleTheListHasOutgrownDoesNotExtendItAgain() async throws {
+        let session = try await open(.company)
+        let pager = try await session.openPager(FetchSpec(entity: "Person", limit: 10))
+        let extended = try await session.loadMore(pager)
+        #expect(extended.count == 20)
+        // The second of two requests made with one handle, arriving after the first is done: the list is as the
+        // first left it.
+        let again = try await session.loadMore(pager)
+        #expect(again.count == 20 && again.hasMore)
+        #expect(try await session.loadMore(extended).count == 30)
+        await session.close()
+    }
+
     @Test func aStalePagerCannotGrow() async throws {
         let session = try await open(.company)
         let pager = try await session.openPager(FetchSpec(entity: "Person", limit: 10))
