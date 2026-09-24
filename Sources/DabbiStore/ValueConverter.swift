@@ -96,9 +96,16 @@ struct ValueConverter: Sendable {
 
     func row(_ object: NSManagedObject, columns: ColumnSet, counts: ToManyCounts = [:]) -> RowSnapshot? {
         guard let ref = ObjectRef(uri: object.objectID.uriRepresentation()),
-            let layout = object.entity.name.flatMap({ layouts[$0] })
+            let values = self.values(of: object, columns: columns, counts: counts)
         else { return nil }
-        let values = columns.properties.map { name -> Value in
+        return RowSnapshot(ref: ref, values: values)
+    }
+
+    /// `object`'s values in `columns` order, whether or not it has a permanent identity; `nil` for an entity the
+    /// model does not describe.
+    func values(of object: NSManagedObject, columns: ColumnSet, counts: ToManyCounts = [:]) -> [Value]? {
+        guard let layout = object.entity.name.flatMap({ layouts[$0] }) else { return nil }
+        return columns.properties.map { name -> Value in
             if let attribute = layout.attributes[name] {
                 return value(object.value(forKey: name), of: attribute)
             }
@@ -107,7 +114,6 @@ struct ValueConverter: Sendable {
             if let counted = counts[name] { return .toMany(count: counted[object.objectID] ?? 0) }
             return toMany(object.value(forKey: name))
         }
-        return RowSnapshot(ref: ref, values: values)
     }
 
     /// One object as the relationships panel lists it: its identity, and the label a to-one would carry (REL-1).

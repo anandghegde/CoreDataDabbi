@@ -105,8 +105,9 @@ struct PendingChangesView: View {
             }
             .padding(.vertical, 2)
             .contentShape(Rectangle())
-            // A saved object can be looked at in the inspector; one that is only inserted is here and nowhere else.
-            .onTapGesture { if let ref = change.object.ref { context.inspect(ref) } }
+            // Any object listed can be looked at, and edited, in the inspector; one only inserted is listed here and
+            // nowhere else until it is committed (EDT-3).
+            .onTapGesture { context.inspect(change.object) }
         }
         .listStyle(.inset)
     }

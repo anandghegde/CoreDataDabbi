@@ -82,7 +82,7 @@ final class RelationshipsModel {
     /// The related object being looked at (REL-1). It is not held here but read back from what the inspector and
     /// the content viewer are showing, so that a click back in the grid takes the highlight off it by itself.
     var selectedItem: ObjectRef? {
-        guard let source, let inspected = context.inspectedObject, inspected != source else { return nil }
+        guard let source, let inspected = context.inspectedRef, inspected != source else { return nil }
         return inspected
     }
 
@@ -243,7 +243,7 @@ final class RelationshipsModel {
     /// Looks at one of the related objects: the inspector and the content viewer follow it, the grid does not
     /// (REL-1). `nil` gives them the grid's row back.
     func selectItem(_ ref: ObjectRef?) {
-        context.inspect(ref ?? source)
+        context.inspect((ref ?? source).map(PendingObjectID.init))
     }
 
     /// Whether there is a related object to jump to — what the Reveal button and the menu item go by (REL-3).

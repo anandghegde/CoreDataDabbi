@@ -780,7 +780,13 @@
     "New %@" : {
 
     },
+    "New Object" : {
+
+    },
     "New Predicate" : {
+
+    },
+    "New — not in the store until it is committed" : {
 
     },
     "No" : {

@@ -159,12 +159,14 @@ extension StoreSession {
                 diagnosis: cause?.diagnosis ?? [], recovery: cause?.recovery ?? [], underlying: error)
         }
         try ensureOpen()
-        let translator = ValidationTranslator(converter: stack.converter)
-        let counts = try await stack.performEditing { context, _ in
+        let (converter, translator) = (stack.converter, ValidationTranslator(converter: stack.converter))
+        let (counts, insertedRefs) = try await stack.performEditing { context, _ in
             let counts = (
                 inserted: context.insertedObjects.count, updated: context.updatedObjects.count,
                 deleted: context.deletedObjects.count
             )
+            // The identities the inserted objects were staged under; the save gives them permanent ones.
+            let inserted = context.insertedObjects.map { (object: $0, staged: converter.pendingID(of: $0)) }
             do {
                 try objcGuarded("The store refused the commit.", code: .commitFailed) { try context.save() }
             } catch let error as DabbiError {
@@ -173,12 +175,17 @@ extension StoreSession {
                 throw Self.commitError(error, translator: translator)
             }
             CoreDataStack.clearUndo(of: context)
-            return counts
+            var insertedRefs: [PendingObjectID: ObjectRef] = [:]
+            for (object, staged) in inserted {
+                insertedRefs[staged] = ObjectRef(uri: object.objectID.uriRepresentation())
+            }
+            return (counts, insertedRefs)
         }
         insertedObjectIDs.removeAll()
         invalidate()
         return CommitSummary(
-            inserted: counts.inserted, updated: counts.updated, deleted: counts.deleted, generation: generation)
+            inserted: counts.inserted, updated: counts.updated, deleted: counts.deleted, generation: generation,
+            insertedRefs: insertedRefs)
     }
 
     /// What deleting `objects` would do by the model's delete rules — what Cascade takes along, what Nullify
@@ -214,11 +221,7 @@ extension StoreSession {
     private func editableObjectID(for object: PendingObjectID) throws -> NSManagedObjectID {
         try ensureOpen()
         guard stack.isEditable else { throw CoreDataStack.notEditable }
-        if let ref = object.ref { return try objectID(for: ref) }
-        guard let id = insertedObjectIDs[object.uri] else {
-            throw DabbiError(.objectNotFound, "\(object) is not staged in this session.")
-        }
-        return id
+        return try objectID(for: object)
     }
 
     private func destinationID(

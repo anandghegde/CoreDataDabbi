@@ -16,33 +16,33 @@ struct DetailsTab: View {
                 title: String(localized: "No row selected"),
                 detail: String(localized: "Select a row in the grid to see everything it holds."))
 
-        case .loading(let ref):
+        case .loading(let object):
             VStack(spacing: 10) {
                 ProgressView()
-                Text(ref.description).font(.callout).foregroundStyle(.secondary)
+                Text(object.description).font(.callout).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        case .failed(let ref, let error):
+        case .failed(let object, let error):
             InspectorMessage(
                 symbol: "exclamationmark.triangle",
                 title: error.errorDescription ?? String(localized: "The row could not be read."),
-                detail: error.recoverySuggestion ?? ref.description)
+                detail: error.recoverySuggestion ?? object.description)
 
-        case .object(let ref, let snapshot):
-            object(ref, snapshot)
+        case .object(let object, let staged):
+            self.object(object, staged)
         }
     }
 
-    private func object(_ ref: ObjectRef, _ snapshot: ObjectSnapshot) -> some View {
-        let fields = properties(of: snapshot)
-        let issues = model.issues(for: ref)
+    private func object(_ object: PendingObjectID, _ staged: StagedObject) -> some View {
+        let fields = properties(of: staged, entity: model.entity(of: object))
+        let issues = model.issues(for: object)
         // Issues about the object as a whole, or a property it has no field for, go under the header.
         let shown = Set(fields.map(\.name))
         let general = issues.filter { issue in issue.property.map { !shown.contains($0) } ?? true }
         return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                header(ref)
+                header(object)
                 ForEach(general, id: \.self) { issue in
                     IssueLine(issue: issue)
                         .padding(.leading, -10)
@@ -54,34 +54,43 @@ struct DetailsTab: View {
                         name: property.name, type: property.type,
                         rendered: GridValue.render(property.value, timeZone: model.timeZone),
                         issue: issues.first { $0.property == property.name },
-                        editing: model.fieldEditing(property.name, value: property.value, of: ref))
+                        editing: model.fieldEditing(property.name, value: property.value, of: object))
                 }
             }
             .padding(.vertical, 10)
         }
         .scrollContentBackground(.hidden)
         // Rows are per object: a field half typed into is never carried over to the next one.
-        .id(ref)
+        .id(object)
     }
 
-    private func header(_ ref: ObjectRef) -> some View {
+    private func header(_ object: PendingObjectID) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(ref.entity)
+            Text(object.entity)
                 .font(.headline)
-            // The URI is what identifies this row anywhere else — in a bug report, in another tool, in code.
-            Text(ref.uri.absoluteString)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .lineLimit(2)
+            if let ref = object.ref {
+                // The URI is what identifies this row anywhere else — in a bug report, in another tool, in code.
+                Text(ref.uri.absoluteString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .lineLimit(2)
+            } else {
+                // An inserted object's URI is a temporary one, and means nothing outside this window.
+                Text(String(localized: "New — not in the store until it is committed"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
         .contextMenu {
-            Button(String(localized: "Copy Object ID URI")) {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(ref.uri.absoluteString, forType: .string)
+            if let ref = object.ref {
+                Button(String(localized: "Copy Object ID URI")) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(ref.uri.absoluteString, forType: .string)
+                }
             }
         }
     }
@@ -92,12 +101,11 @@ struct DetailsTab: View {
         var type: String?
     }
 
-    private func properties(of snapshot: ObjectSnapshot) -> [Property] {
-        let entity = model.entity
-        return snapshot.columns.properties.enumerated().map { index, name in
+    private func properties(of staged: StagedObject, entity: EntityDescription?) -> [Property] {
+        staged.columns.properties.enumerated().map { index, name in
             Property(
                 name: name,
-                value: index < snapshot.row.values.count ? snapshot.row.values[index] : .null,
+                value: index < staged.values.count ? staged.values[index] : .null,
                 type: entity?.attribute(named: name)?.type.displayName
                     ?? entity?.relationship(named: name).map {
                         $0.isToMany

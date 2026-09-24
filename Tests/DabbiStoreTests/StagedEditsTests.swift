@@ -226,6 +226,41 @@ import Testing
         await #expect(throws: DabbiError.self) {
             try await session.setValue(.string("x"), for: "name", of: object)
         }
+        await #expect(throws: DabbiError.self) { try await session.stagedObject(object) }
+        await session.close()
+    }
+
+    @Test func objectsAreReadAsStagedInsertedOnesIncluded() async throws {
+        let (session, location) = try await open(.basic)
+        // Found before the insert: a fetch with a limit counts an inserted object, which has no reference to
+        // return, against it.
+        let ref = try await firstRow(session, "Sample")
+        let (object, _) = try await session.insertObject(entity: "Sample")
+        try await session.setValue(.string("Fresh"), for: "name", of: object)
+
+        // An inserted object has no reference yet, and is read by the identity it was staged under.
+        let inserted = try await session.stagedObject(object)
+        #expect(inserted.object == object)
+        #expect(inserted["name"] == .string("Fresh"))
+        #expect(inserted.columns.properties.contains("name"))
+        #expect(inserted.values.count == inserted.columns.properties.count)
+
+        // A saved object reads as `object(_:)` reads it: as staged.
+        try await session.setValue(.string("Changed"), for: "name", of: PendingObjectID(ref))
+        let saved = try await session.stagedObject(PendingObjectID(ref))
+        let snapshot = try await session.object(ref)
+        #expect(saved["name"] == .string("Changed"))
+        #expect(saved.columns == snapshot.columns && saved.values == snapshot.row.values)
+
+        // The commit says which reference the inserted object was given, and it is read by that from then on.
+        let summary = try await session.commit()
+        let committed = try #require(summary.insertedRefs[object])
+        #expect(summary.insertedRefs.count == 1)
+        #expect(committed.entity == "Sample")
+        #expect(try await session.object(committed)["name"] == .string("Fresh"))
+        #expect(try fileValue(location, "SELECT ZNAME FROM ZSAMPLE WHERE Z_PK = \(committed.pk)") == .text("Fresh"))
+        let gone = await #expect(throws: DabbiError.self) { try await session.stagedObject(object) }
+        #expect(gone?.code == .objectNotFound)
         await session.close()
     }
 

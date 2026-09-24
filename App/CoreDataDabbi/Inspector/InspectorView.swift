@@ -35,7 +35,7 @@ struct InspectorView: View {
     /// Everything a refresh depends on, so that SwiftUI restarts the task when any of it moves. Reading these
     /// inside the view body is what subscribes it to the context in the first place.
     private struct Trigger: Equatable {
-        var object: ObjectRef?
+        var object: PendingObjectID?
         var entity: String?
         var tab: InspectorModel.Tab
         var session: ObjectIdentifier?
