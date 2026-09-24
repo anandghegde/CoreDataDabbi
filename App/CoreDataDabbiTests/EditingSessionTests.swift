@@ -13,11 +13,14 @@ import Testing
     final class Recorder {
         var errors: [DabbiError] = []
         var asked = 0
+        var previews: [DeletePreview] = []
     }
 
-    private func editableContext(_ recorder: Recorder) async throws -> (ProjectContext, URL) {
+    private func editableContext(
+        _ recorder: Recorder, fixture: Fixture = .basic
+    ) async throws -> (ProjectContext, URL) {
         let folder = try AppFixtures.scratchFolder()
-        let store = try ProjectRepairTests.copyStore(to: folder)
+        let store = try Self.copy(fixture, to: folder)
         var package = ProjectPackage()
         package.project.accessMode = .editable
         let context = ProjectContext(package: package)
@@ -31,6 +34,17 @@ import Testing
         #expect(context.accessMode == .editable)
         #expect(context.editing.isEditable)
         return (context, folder)
+    }
+
+    /// A store of the test's own, since an editable session writes to it.
+    private static func copy(_ fixture: Fixture, to folder: URL) throws -> URL {
+        guard fixture != .basic else { return try ProjectRepairTests.copyStore(to: folder) }
+        let source = try AppFixtures.location(fixture).storeURL
+        let destination = folder.appendingPathComponent(source.lastPathComponent)
+        for suffix in ["", "-wal", "-shm"] where FileManager.default.fileExists(atPath: source.path + suffix) {
+            try FileManager.default.copyItem(atPath: source.path + suffix, toPath: destination.path + suffix)
+        }
+        return destination
     }
 
     private func samples(_ context: ProjectContext) async throws -> [ObjectRef] {
@@ -190,6 +204,80 @@ import Testing
         #expect(!context.editing.isEditable)
         #expect(!context.editing.commit().isCancelled)
         #expect(await context.editing.commit().value == false)
+        context.shutDown()
+    }
+
+    @Test func brokenRulesAreListedByObjectAndField() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder)
+        let object = PendingObjectID(try await firstSample(context))
+
+        // `name` must be at least one character long (EDT-2).
+        context.editing.setValue(.string(""), for: "name", of: object)
+        await context.whenSettled()
+        let issue = try #require(context.editing.issue(for: object, property: "name"))
+        #expect(issue.rule == .tooShort)
+        #expect(context.editing.issues(for: object) == [issue])
+        #expect(context.editing.issue(for: object, property: "int32Value") == nil)
+        #expect(PendingChangesView.problems(context.editing.changes.issues.count) == "1 problem")
+        #expect(IssueLine.spoken(issue) == "name, Must be at least 1 character long.")
+        #expect(DetailsTab.spoken("name", "empty", issue: issue) == "name: empty, Must be at least 1 character long.")
+
+        context.editing.undoManager.undo()
+        await context.whenSettled()
+        #expect(context.editing.issues(for: object).isEmpty)
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
+    @Test func aDeleteThatReachesFurtherIsAskedAboutFirst() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder, fixture: .company)
+        let session = try #require(context.session)
+        let organisation = PendingObjectID(
+            try #require(try await session.references(FetchSpec(entity: "Organisation"), limit: 1).first))
+
+        // Declined: nothing is staged, and there is nothing to undo.
+        context.editing.delete([organisation]) { preview in
+            recorder.previews.append(preview)
+            return false
+        }
+        await context.whenSettled()
+        let preview = try #require(recorder.previews.first)
+        #expect(preview.cascaded.map(\.entity) == ["Department"])
+        #expect(!context.editing.hasChanges)
+        #expect(!context.editing.undoManager.canUndo)
+
+        // What the window asks with names what goes along, and why the commit would refuse it.
+        let text = ProjectWindowController.describe(preview)
+        #expect(text.contains("Department ("))
+        #expect(text.contains("employees"))
+
+        // Accepted: staged with its cascade, and the Deny rule it meets is already an issue.
+        context.editing.delete([organisation]) { _ in true }
+        await context.whenSettled()
+        #expect(context.editing.changes.change(for: organisation)?.kind == .deleted)
+        #expect(context.editing.changes.count(of: .deleted) == 1 + preview.cascadedCount)
+        #expect(context.editing.changes.issues.contains { $0.rule == .deleteDenied })
+        #expect(context.editing.undoManager.canUndo)
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
+    @Test func aPlainDeleteIsNotAskedAbout() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder, fixture: .company)
+        let session = try #require(context.session)
+        let tag = PendingObjectID(try #require(try await session.references(FetchSpec(entity: "Tag"), limit: 1).first))
+
+        // A tag only unlinks the people it is on.
+        context.editing.delete([tag]) { preview in
+            recorder.previews.append(preview)
+            return false
+        }
+        await context.whenSettled()
+        #expect(recorder.previews.isEmpty)
+        #expect(context.editing.changes.change(for: tag)?.kind == .deleted)
         context.shutDown()
     }
 

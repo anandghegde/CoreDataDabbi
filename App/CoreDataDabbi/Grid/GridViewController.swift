@@ -406,8 +406,22 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         guard let tableColumn, let column = column(for: tableColumn) else { return nil }
         let cell =
             tableView.makeView(withIdentifier: .gridCell, owner: self) as? GridCellView ?? GridCellView()
-        cell.show(value(at: row, column: column) ?? .notLoaded, trailing: column.isTrailing, column: column.title)
+        cell.show(
+            value(at: row, column: column) ?? .notLoaded, trailing: column.isTrailing, column: column.title,
+            issue: issue(at: row, column: column)?.message)
         return cell
+    }
+
+    /// The rule of the model the staged value in this cell breaks, if it breaks one (EDT-2). The grid re-reads
+    /// its rows whenever what is staged changes, which is what brings the cells back through here.
+    func issue(at row: Int, column: GridColumn) -> ValidationIssue? {
+        guard !context.editing.changes.issues.isEmpty, let ref = reference(at: row) else { return nil }
+        switch column.kind {
+        case .attribute, .relationship:
+            return context.editing.issue(for: PendingObjectID(ref), property: column.property)
+        case .objectID, .entity:
+            return nil
+        }
     }
 
     func value(at row: Int, column: GridColumn) -> GridValue? {

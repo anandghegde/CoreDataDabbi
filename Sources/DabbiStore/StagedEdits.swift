@@ -159,6 +159,7 @@ extension StoreSession {
                 diagnosis: cause?.diagnosis ?? [], recovery: cause?.recovery ?? [], underlying: error)
         }
         try ensureOpen()
+        let translator = ValidationTranslator(converter: stack.converter)
         let counts = try await stack.performEditing { context, _ in
             let counts = (
                 inserted: context.insertedObjects.count, updated: context.updatedObjects.count,
@@ -169,7 +170,7 @@ extension StoreSession {
             } catch let error as DabbiError {
                 throw error
             } catch {
-                throw Self.commitError(error)
+                throw Self.commitError(error, translator: translator)
             }
             CoreDataStack.clearUndo(of: context)
             return counts
@@ -178,6 +179,20 @@ extension StoreSession {
         invalidate()
         return CommitSummary(
             inserted: counts.inserted, updated: counts.updated, deleted: counts.deleted, generation: generation)
+    }
+
+    /// What deleting `objects` would do by the model's delete rules — what Cascade takes along, what Nullify
+    /// unlinks, what is left pointing at objects that are gone, and what the commit would refuse — worked out
+    /// without staging anything (EDT-2). The undo stack, redo included, is as it was.
+    ///
+    /// - Parameter sampleSize: how many objects of each group to name.
+    public func deletePreview(of objects: [PendingObjectID], sampleSize: Int = 5) async throws -> DeletePreview {
+        let ids = try objects.map { (id: try editableObjectID(for: $0), object: $0) }
+        let rules = DeleteRules(converter: stack.converter)
+        return try await stack.performEditing { context, _ in
+            let targets = try ids.map { try Self.existingObject($0.id, object: $0.object, in: context) }
+            return rules.preview(of: targets, sampleSize: max(0, sampleSize), in: context)
+        }
     }
 
     // MARK: Helpers
@@ -243,12 +258,27 @@ extension StoreSession {
         return found
     }
 
-    /// A failed save, as the error a front end explains. Row values never go into it, only which object and
-    /// which property (privacy).
-    static func commitError(_ error: any Error) -> DabbiError {
+    /// A failed save, as the error a front end explains. Row values never go into it, only which object, which
+    /// property and which rule (privacy). Inside `perform` only: the translator reads the objects the error names.
+    static func commitError(_ error: any Error, translator: ValidationTranslator) -> DabbiError {
         let nsError = error as NSError
         guard nsError.domain == NSCocoaErrorDomain else {
             return DabbiError(.commitFailed, "The store refused the commit. Nothing was written.", underlying: error)
+        }
+        if ValidationTranslator.isValidationError(nsError) {
+            // The same issues the pending changes list, one line each: “Sample#3 · name: A value is required.”
+            let issues = ValidationTranslator.sorted(translator.issues(from: error))
+            let count = max(issues.count, 1)
+            return DabbiError(
+                .validationFailed,
+                count == 1
+                    ? "One value does not pass the model's validation. Nothing was written."
+                    : "\(count) values do not pass the model's validation. Nothing was written.",
+                arguments: ["count": String(count)],
+                diagnosis: issues.isEmpty
+                    ? ["An object does not pass the model's validation."] : issues.map(\.description),
+                recovery: ["Correct the values, or undo the edits that set them, then commit again."],
+                underlying: error)
         }
         switch nsError.code {
         case NSManagedObjectMergeError, NSPersistentStoreSaveConflictsError, NSManagedObjectConstraintMergeError:
@@ -266,47 +296,8 @@ extension StoreSession {
                     "Discard the changes to start again from what is in the store.",
                 ],
                 underlying: error)
-        case NSValidationMultipleErrorsError, NSManagedObjectValidationError...NSValidationStringPatternMatchingError:
-            let details = (nsError.userInfo[NSDetailedErrorsKey] as? [NSError]) ?? [nsError]
-            return DabbiError(
-                .validationFailed,
-                details.count == 1
-                    ? "One value does not pass the model's validation. Nothing was written."
-                    : "\(details.count) values do not pass the model's validation. Nothing was written.",
-                arguments: ["count": String(details.count)],
-                diagnosis: details.map(validationDiagnosis),
-                recovery: ["Correct the values, or undo the edits that set them, then commit again."],
-                underlying: error)
         default:
             return DabbiError(.commitFailed, "The store refused the commit. Nothing was written.", underlying: error)
         }
-    }
-
-    /// “Sample#3 · name: is required.” — the object, the property and the rule, never the value.
-    private static func validationDiagnosis(_ error: NSError) -> String {
-        let object = error.userInfo[NSValidationObjectErrorKey] as? NSManagedObject
-        let who =
-            object.map { object in
-                ObjectRef(uri: object.objectID.uriRepresentation())?.description
-                    ?? "new \(object.entity.name ?? "object")"
-            } ?? "An object"
-        let key = error.userInfo[NSValidationKeyErrorKey] as? String
-        let rule: String =
-            switch error.code {
-            case NSValidationMissingMandatoryPropertyError: "is required"
-            case NSValidationRelationshipLacksMinimumCountError: "has too few objects"
-            case NSValidationRelationshipExceedsMaximumCountError: "has too many objects"
-            case NSValidationRelationshipDeniedDeleteError: "still has objects, and its delete rule is Deny"
-            case NSValidationNumberTooLargeError: "is above the model's maximum"
-            case NSValidationNumberTooSmallError: "is below the model's minimum"
-            case NSValidationDateTooLateError: "is later than the model allows"
-            case NSValidationDateTooSoonError: "is earlier than the model allows"
-            case NSValidationInvalidDateError: "is not a valid date"
-            case NSValidationStringTooLongError: "is longer than the model allows"
-            case NSValidationStringTooShortError: "is shorter than the model allows"
-            case NSValidationStringPatternMatchingError: "does not match the model's pattern"
-            default: "does not pass the model's validation"
-            }
-        return key.map { "\(who) · \($0): \(rule)." } ?? "\(who): \(rule)."
     }
 }

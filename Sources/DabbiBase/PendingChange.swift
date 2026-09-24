@@ -77,10 +77,13 @@ public struct PendingChanges: Sendable, Hashable, Codable {
     /// How many edits `undo()` can take back, one at a time. A front end mirroring the undo stack in its own
     /// compares it before and after a call to tell an edit from one that changed nothing.
     public var undoDepth: Int
+    /// Every rule of the model the staged objects break as they stand (EDT-2): what the commit would refuse
+    /// with `.validationFailed`. By object, then property.
+    public var issues: [ValidationIssue]
 
     public init(
         changes: [PendingChange], canUndo: Bool = false, canRedo: Bool = false, undoActionName: String = "",
-        redoActionName: String = "", undoDepth: Int = 0
+        redoActionName: String = "", undoDepth: Int = 0, issues: [ValidationIssue] = []
     ) {
         self.changes = changes
         self.canUndo = canUndo
@@ -88,6 +91,7 @@ public struct PendingChanges: Sendable, Hashable, Codable {
         self.undoActionName = undoActionName
         self.redoActionName = redoActionName
         self.undoDepth = undoDepth
+        self.issues = issues
     }
 
     public static let none = PendingChanges(changes: [])
@@ -100,6 +104,11 @@ public struct PendingChanges: Sendable, Hashable, Codable {
 
     public func change(for object: PendingObjectID) -> PendingChange? {
         changes.first { $0.object == object }
+    }
+
+    /// The rules `object` breaks, its own and its properties'.
+    public func issues(for object: PendingObjectID) -> [ValidationIssue] {
+        issues.filter { $0.object == object }
     }
 }
 

@@ -15,6 +15,16 @@
         }
       }
     },
+    "%@ (%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$lld)"
+          }
+        }
+      }
+    },
     "%@ of %@" : {
       "localizations" : {
         "en" : {
@@ -206,6 +216,9 @@
     "%lld older objects dropped from the log" : {
 
     },
+    "%lld problems" : {
+
+    },
     "%lld removed" : {
 
     },
@@ -222,6 +235,9 @@
 
     },
     "1 app installed" : {
+
+    },
+    "1 problem" : {
 
     },
     "1 store" : {
@@ -255,6 +271,9 @@
 
     },
     "Allow Editing" : {
+
+    },
+    "Also deleted, by Cascade rules: %@" : {
 
     },
     "An empty string, not nil" : {
@@ -679,6 +698,9 @@
     },
     "Last change: %lld ms from save to screen" : {
       "comment" : "Tracking latency in the footer tooltip"
+    },
+    "Left pointing at a deleted object, with no rule to unlink it: %@" : {
+
     },
     "Length" : {
 
@@ -1223,10 +1245,22 @@
     "The builder could not show this predicate. It is kept as text." : {
 
     },
+    "The commit would be refused until these are resolved." : {
+
+    },
+    "The commit would refuse this delete" : {
+
+    },
     "The copy is of the store as it is on disk. Pending changes are not in it." : {
 
     },
     "The copy of the store is thrown away. This cannot be undone." : {
+
+    },
+    "The delete can be undone until it is committed." : {
+
+    },
+    "The delete reaches beyond the selected rows" : {
 
     },
     "The field could not be read." : {
@@ -1371,6 +1405,9 @@
 
     },
     "Unknown App" : {
+
+    },
+    "Unlinked, by Nullify rules: %@" : {
 
     },
     "Updated" : {
@@ -1702,6 +1739,9 @@
 
     },
     "… %lld more characters not shown." : {
+
+    },
+    "…and %lld more" : {
 
     }
   },

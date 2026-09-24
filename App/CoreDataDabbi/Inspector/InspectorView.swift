@@ -39,6 +39,7 @@ struct InspectorView: View {
         var entity: String?
         var tab: InspectorModel.Tab
         var session: ObjectIdentifier?
+        var edits: Int
 
         @MainActor
         init(model: InspectorModel) {
@@ -46,6 +47,7 @@ struct InspectorView: View {
             entity = model.entityName
             tab = model.tab
             session = model.sessionIdentity
+            edits = model.editRevision
         }
     }
 }

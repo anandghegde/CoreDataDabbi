@@ -5,6 +5,9 @@ import DabbiKit
 @MainActor
 final class GridCellView: NSTableCellView {
     private let label = NSTextField(labelWithString: "")
+    /// Shown when the staged value breaks a rule of the model (EDT-2): a symbol, not only a colour.
+    private let badge = NSImageView()
+    private var labelTrailing: NSLayoutConstraint?
 
     init() {
         super.init(frame: .zero)
@@ -15,19 +18,36 @@ final class GridCellView: NSTableCellView {
         label.cell?.usesSingleLineMode = true
         addSubview(label)
         textField = label
+
+        badge.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)
+        badge.contentTintColor = .systemRed
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        badge.isHidden = true
+        badge.setAccessibilityElement(false)
+        addSubview(badge)
+
+        let trailing = label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2)
+        labelTrailing = trailing
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            trailing,
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            badge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            badge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            badge.widthAnchor.constraint(equalToConstant: Self.badgeWidth),
+            badge.heightAnchor.constraint(equalToConstant: Self.badgeWidth),
         ])
     }
+
+    private static let badgeWidth: CGFloat = 13
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not in a nib") }
 
     /// `column` is the column's title: what VoiceOver says before the value, since a cell out of its row says
-    /// nothing about which field it holds (§8.4).
-    func show(_ value: GridValue, trailing: Bool, column: String = "") {
+    /// nothing about which field it holds (§8.4). `issue` is the rule of the model the staged value breaks, in
+    /// words (EDT-2): the cell is marked, and the words are its tooltip and its accessibility help.
+    func show(_ value: GridValue, trailing: Bool, column: String = "", issue: String? = nil) {
         label.alignment = trailing ? .right : .left
         switch value.emphasis {
         case .value:
@@ -46,14 +66,21 @@ final class GridCellView: NSTableCellView {
             label.font = font
             label.attributedStringValue = Self.reference(value.text, font: font)
         }
-        toolTip = value.tooltip
+        badge.isHidden = issue == nil
+        labelTrailing?.constant = issue == nil ? -2 : -(4 + Self.badgeWidth)
+        let tips = [issue, value.tooltip].compactMap { $0 }
+        toolTip = tips.isEmpty ? nil : tips.joined(separator: "\n")
         // The cell is the element VoiceOver lands on; the label inside it has nothing to add.
         label.setAccessibilityElement(false)
         setAccessibilityElement(true)
         setAccessibilityRole(.staticText)
         setAccessibilityLabel(column.isEmpty ? nil : column)
         setAccessibilityValue(value.accessibleText)
+        setAccessibilityHelp(issue)
     }
+
+    /// Whether the cell is marked as breaking a rule. For the tests.
+    var showsIssue: Bool { !badge.isHidden }
 
     /// Underlines what can be followed when colour is not to be relied on (§8.4, Differentiate Without Color).
     private static func reference(_ text: String, font: NSFont) -> NSAttributedString {
