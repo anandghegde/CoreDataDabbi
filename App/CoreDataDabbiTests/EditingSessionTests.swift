@@ -230,6 +230,49 @@ import Testing
         context.shutDown()
     }
 
+    @Test func theInspectorStagesWhatIsTypedAndExplainsWhatIsNot() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder)
+        let ref = try await firstSample(context)
+        let object = PendingObjectID(ref)
+        let inspector = InspectorModel(context: context)
+
+        // Binary data and transformables have editors of their own, not a text field (EDT-3).
+        #expect(inspector.editableAttribute("dataValue", of: ref) == nil)
+        #expect(inspector.editableAttribute("keywords", of: ref) == nil)
+        let number = try #require(inspector.editableAttribute("int32Value", of: ref))
+
+        // What cannot be the attribute's type is explained, and nothing is staged.
+        #expect(inspector.stage("not a number", for: number, of: ref) == "This is not a whole number.")
+        await context.whenSettled()
+        #expect(!context.editing.hasChanges)
+
+        #expect(inspector.stage(" 7 ", for: number, of: ref) == nil)
+        await context.whenSettled()
+        let field = context.editing.changes.change(for: object)?.fields.first { $0.property == "int32Value" }
+        #expect(field?.after == .int(7))
+        #expect(context.editing.undoManager.undoActionName == "Edit int32Value")
+
+        // Nil for an attribute that must have a value is staged, and is an issue straight away (EDT-2).
+        let name = try #require(inspector.editableAttribute("name", of: ref))
+        inspector.clear(name, of: ref)
+        await context.whenSettled()
+        #expect(context.editing.issue(for: object, property: "name")?.rule == .required)
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
+    @Test func theInspectorOffersNothingToEditWhenReadOnly() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder)
+        context.setAccessMode(.readOnly)
+        await context.whenSettled()
+        #expect(context.accessMode == .readOnly)
+        let ref = try await firstSample(context)
+        #expect(InspectorModel(context: context).editableAttribute("name", of: ref) == nil)
+        context.shutDown()
+    }
+
     @Test func aDeleteThatReachesFurtherIsAskedAboutFirst() async throws {
         let recorder = Recorder()
         let (context, _) = try await editableContext(recorder, fixture: .company)

@@ -91,6 +91,38 @@ final class InspectorModel {
         context.editing.issues(for: PendingObjectID(ref))
     }
 
+    // MARK: Editing (EDT-3)
+
+    /// The attribute `name` of `ref`'s own entity, when the store is open for editing and the attribute is one a
+    /// person can type: stored, not derived, and of a type `ValueText` reads.
+    func editableAttribute(_ name: String, of ref: ObjectRef) -> AttributeDescription? {
+        guard context.accessMode == .editable,
+            let attribute = context.model?.entity(named: ref.entity)?.attribute(named: name),
+            !attribute.isTransient, !attribute.isDerived, ValueText.isEditableAsText(attribute.type)
+        else { return nil }
+        return attribute
+    }
+
+    /// Stages what was typed into `attribute`'s field of `ref`, read in the project's time zone.
+    ///
+    /// - Returns: why the text cannot be a value of the attribute's type, for the field to show while it keeps the
+    ///   text; `nil` once the value is sent to be staged. A value the session then refuses is explained by the
+    ///   window, as any refused edit is.
+    func stage(_ text: String, for attribute: AttributeDescription, of ref: ObjectRef) -> String? {
+        do {
+            let value = try ValueText.value(from: text, for: attribute.type, timeZone: timeZone)
+            context.editing.setValue(value, for: attribute.name, of: PendingObjectID(ref))
+            return nil
+        } catch {
+            return DabbiError.wrapping(error).message
+        }
+    }
+
+    /// Stages no value for `attribute` of `ref`.
+    func clear(_ attribute: AttributeDescription, of ref: ObjectRef) {
+        context.editing.setValue(.null, for: attribute.name, of: PendingObjectID(ref))
+    }
+
     /// Reads whatever the current tab needs. Called from the view's `task`, so that a tab nobody looks at costs
     /// nothing — the Structure tab in particular runs four `PRAGMA`s the Details tab has no use for.
     func refresh() {
