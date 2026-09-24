@@ -262,7 +262,7 @@ import Testing
         context.shutDown()
     }
 
-    @Test func aReadOnlyStoreHasNothingToEdit() async throws {
+    @Test func theInspectorOffersNothingToEditWhenReadOnly() async throws {
         let recorder = Recorder()
         let (context, _) = try await editableContext(recorder)
         context.setAccessMode(.readOnly)
