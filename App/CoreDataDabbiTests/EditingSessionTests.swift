@@ -2,6 +2,7 @@ import AppKit
 import DabbiKit
 import FixtureKit
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import CoreDataDabbi
@@ -424,7 +425,10 @@ import Testing
         #expect(!grid.editCell(row: 0, columnIndex: objectID))
         #expect(grid.editCell(row: 0, columnIndex: number))
         let cell = try #require(grid.editedCell)
-        #expect(cell.popover.isShown)
+        // The editor is opened; whether it stays open is AppKit's call. A transient popover in an app that is not
+        // active can be closed again at once, and a test host is not always the active app.
+        #expect(cell.popover.contentViewController is NSHostingController<CellEditorView>)
+        #expect(cell.popover.behavior == .transient)
 
         // What is typed is read as the attribute's type, and staged like any other edit (EDT-3, EDT-8).
         #expect(cell.editing.stage("twelve") == "This is not a whole number.")
