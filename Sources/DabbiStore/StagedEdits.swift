@@ -210,7 +210,7 @@ extension StoreSession {
         case toOne(NSManagedObjectID?)
     }
 
-    private func entityDescription(_ name: String) throws -> EntityDescription {
+    func entityDescription(_ name: String) throws -> EntityDescription {
         guard let entity = info.model.entity(named: name) else {
             throw DabbiError(
                 .unknownEntity, "The model has no entity named “\(name)”.", arguments: ["entity": name])
@@ -218,7 +218,7 @@ extension StoreSession {
         return entity
     }
 
-    private func editableObjectID(for object: PendingObjectID) throws -> NSManagedObjectID {
+    func editableObjectID(for object: PendingObjectID) throws -> NSManagedObjectID {
         try ensureOpen()
         guard stack.isEditable else { throw CoreDataStack.notEditable }
         return try objectID(for: object)
@@ -252,7 +252,8 @@ extension StoreSession {
         }
     }
 
-    private static func existingObject(
+    /// A staged edit's object, refused when it is gone or staged for deletion.
+    static func existingObject(
         _ id: NSManagedObjectID, object: PendingObjectID?, in context: NSManagedObjectContext
     ) throws -> NSManagedObject {
         guard let found = try? context.existingObject(with: id), !found.isDeleted else {

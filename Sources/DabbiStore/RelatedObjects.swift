@@ -7,24 +7,33 @@ import Foundation
 /// the rest. `count` is the whole relationship; `items` is as much of it as was asked for.
 public struct RelatedObjects: Sendable, Hashable, Codable {
     public struct Item: Sendable, Hashable, Codable {
-        public var ref: ObjectRef
+        /// The object: a saved one by its reference, or one only inserted — linked in an editable session and
+        /// not committed yet — by the identity it was staged under (EDT-3).
+        public var object: PendingObjectID
         /// The destination entity's display attribute, when it has one and the object has a value for it.
         public var display: String?
 
-        public init(ref: ObjectRef, display: String? = nil) {
-            self.ref = ref
+        public init(object: PendingObjectID, display: String? = nil) {
+            self.object = object
             self.display = display
         }
 
+        public init(ref: ObjectRef, display: String? = nil) {
+            self.init(object: PendingObjectID(ref), display: display)
+        }
+
+        /// The saved object's reference; `nil` for one only inserted.
+        public var ref: ObjectRef? { object.ref }
+
         /// What to show for this object: its label, or its identity when it has none.
-        public var label: String { display ?? ref.description }
+        public var label: String { display ?? object.description }
     }
 
     public var relationship: String
     public var destinationEntity: String
     public var isToMany: Bool
     /// An ordered to-many keeps the order it was given; everything else is listed in object-ID order, which is
-    /// the order the grid shows.
+    /// the order the grid shows, with objects only inserted after the saved ones.
     public var isOrdered: Bool
     /// How many there are altogether, which can be more than `items` holds.
     public var count: Int

@@ -323,6 +323,54 @@ import Testing
         context.shutDown()
     }
 
+    @Test func theRelationshipsPanelMakesRelatedObjectsAndUnlinksThem() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder, fixture: .company)
+        context.select(entity: "Department")
+        let session = try #require(context.session)
+        let department = try #require(try await session.references(FetchSpec(entity: "Department"), limit: 1).first)
+        context.focus(on: department)
+        let panel = RelationshipsModel(context: context)
+        panel.refresh()
+        await panel.whenSettled()
+        panel.select("employees")
+        await panel.whenSettled()
+        let before = try #require(panel.related).items.map(\.object)
+        #expect(panel.canEdit)
+        #expect(panel.insertableEntities == ["Employee", "Manager"])
+
+        // A new object on the far side, linked already, and shown in the inspector to be filled in (EDT-3).
+        panel.insertRelated("Employee")
+        await context.whenSettled()
+        let created = try #require(context.inspectedObject)
+        #expect(created.isInserted && created.entity == "Employee")
+        #expect(context.editing.undoManager.undoActionName == "New Employee")
+        panel.refresh()
+        await panel.whenSettled()
+        #expect(panel.related?.items.map(\.object) == before + [created])
+        #expect(panel.selectedItem == created)
+        // No grid lists it until it is committed.
+        #expect(!panel.canReveal)
+
+        // Unlinking takes it out of the relationship, not out of what is staged; the inspector goes back to the
+        // grid's row.
+        panel.unlink(created)
+        await context.whenSettled()
+        #expect(context.inspectedObject == PendingObjectID(department))
+        #expect(context.editing.undoManager.undoActionName == "Unlink employees")
+        #expect(context.editing.changes.change(for: created)?.kind == .inserted)
+        panel.refresh()
+        await panel.whenSettled()
+        #expect(panel.related?.items.map(\.object) == before)
+
+        // A to-one's object is chosen with the picker, not made here.
+        panel.select("head")
+        await panel.whenSettled()
+        #expect(panel.insertableEntities.isEmpty)
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
     @Test func anAbstractEntityHasNoNewObject() async throws {
         let recorder = Recorder()
         let (context, _) = try await editableContext(recorder, fixture: .company)

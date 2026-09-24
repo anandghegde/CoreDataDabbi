@@ -321,7 +321,7 @@ import Testing
         #expect(!model.canReveal)
 
         // Picking one shows it in the inspector without moving the grid (REL-1).
-        model.selectItem(employee.ref)
+        model.selectItem(employee.object)
         for _ in 0..<15 {
             if case .object(let shown, _) = inspector.model.details, shown.ref == employee.ref { break }
             try await Task.sleep(for: .milliseconds(20))

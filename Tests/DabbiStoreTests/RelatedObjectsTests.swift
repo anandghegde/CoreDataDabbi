@@ -58,9 +58,9 @@ import Testing
         #expect(!employees.isTruncated)
         // The fixture spreads 25 employees over 4 departments; every one of them is an Employee or a Manager.
         #expect(employees.count > 0)
-        #expect(employees.items.allSatisfy { ["Employee", "Manager"].contains($0.ref.entity) })
+        #expect(employees.items.allSatisfy { ["Employee", "Manager"].contains($0.object.entity) })
         // Listed in object-ID order, so the same relationship reads the same way twice.
-        #expect(employees.items.map(\.ref.pk) == employees.items.map(\.ref.pk).sorted())
+        #expect(employees.items.compactMap(\.ref?.pk) == employees.items.compactMap(\.ref?.pk).sorted())
         // Every Party has a name, which is what labels it wherever it is pointed at.
         #expect(employees.items.allSatisfy { $0.display?.isEmpty == false })
         #expect(employees.items.first?.label == employees.items.first?.display)
@@ -76,7 +76,7 @@ import Testing
         #expect(organisation.destinationEntity == "Organisation")
         #expect(organisation.count == 1)
         #expect(organisation.items.count == 1)
-        #expect(organisation.items.first?.ref.entity == "Organisation")
+        #expect(organisation.items.first?.object.entity == "Organisation")
     }
 
     @Test func readsBothEndsOfAManyToMany() async throws {

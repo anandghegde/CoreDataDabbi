@@ -21,11 +21,13 @@ struct RelationshipsView: View {
     private struct Trigger: Equatable {
         var source: ObjectRef?
         var session: ObjectIdentifier?
+        var edits: Int
 
         @MainActor
         init(model: RelationshipsModel) {
             source = model.source
             session = model.sessionIdentity
+            edits = model.editRevision
         }
     }
 
@@ -184,6 +186,7 @@ struct RelationshipsView: View {
                     .foregroundStyle(.secondary)
                     .help(String(localized: "The first \(RelationshipsModel.pageLimit) are listed."))
             }
+            if model.canEdit { newRelated }
             Button(String(localized: "Reveal"), action: model.revealSelected)
                 .disabled(!model.canReveal)
                 .controlSize(.small)
@@ -193,12 +196,36 @@ struct RelationshipsView: View {
         .padding(.vertical, 6)
     }
 
-    private var itemSelection: Binding<ObjectRef?> {
+    /// A new object on the far side, linked already (EDT-3): one button for a destination that is one entity, a
+    /// menu for one with sub-entities to choose from.
+    @ViewBuilder
+    private var newRelated: some View {
+        let entities = model.insertableEntities
+        if entities.count == 1, let entity = entities.first {
+            Button(String(localized: "New Related Object"), systemImage: "plus") { model.insertRelated(entity) }
+                .labelStyle(.iconOnly)
+                .controlSize(.small)
+                .help(String(localized: "New \(entity), linked to this object"))
+        } else if entities.count > 1 {
+            Menu(String(localized: "New Related Object"), systemImage: "plus") {
+                ForEach(entities, id: \.self) { entity in
+                    Button(entity) { model.insertRelated(entity) }
+                }
+            }
+            .labelStyle(.iconOnly)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .controlSize(.small)
+            .help(String(localized: "New related object, linked to this object"))
+        }
+    }
+
+    private var itemSelection: Binding<PendingObjectID?> {
         Binding(get: { model.selectedItem }, set: { model.selectItem($0) })
     }
 
     private func items(of related: RelatedObjects) -> some View {
-        List(Array(related.items.enumerated()), id: \.element.ref, selection: itemSelection) { index, item in
+        List(Array(related.items.enumerated()), id: \.element.object, selection: itemSelection) { index, item in
             HStack(spacing: 6) {
                 // An ordered relationship keeps the order it was given, and the position is part of the data
                 // (REL-2).
@@ -211,29 +238,49 @@ struct RelationshipsView: View {
                 Text(item.label)
                     .lineLimit(1)
                 Spacer(minLength: 4)
+                // Only inserted: in no grid, and with no URI worth copying, until it is committed.
+                if item.ref == nil {
+                    Text(String(localized: "New"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 // Which sub-entity it turned out to be, where that is not the destination itself.
-                if item.ref.entity != related.destinationEntity {
-                    Text(item.ref.entity)
+                if item.object.entity != related.destinationEntity {
+                    Text(item.object.entity)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .tag(item.ref)
-            .help(item.ref.description)
+            .tag(item.object)
+            .help(item.object.description)
             .contentShape(Rectangle())
             // The list's own click keeps working; this only adds the second one.
-            .simultaneousGesture(TapGesture(count: 2).onEnded { model.reveal(item.ref) })
+            .simultaneousGesture(TapGesture(count: 2).onEnded { if let ref = item.ref { model.reveal(ref) } })
             .contextMenu {
-                Button(String(localized: "Reveal in Entity")) { model.reveal(item.ref) }
-                Button(String(localized: "Copy Object ID URI")) {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(item.ref.uri.absoluteString, forType: .string)
+                if let ref = item.ref {
+                    Button(String(localized: "Reveal in Entity")) { model.reveal(ref) }
+                    Button(String(localized: "Copy Object ID URI")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(ref.uri.absoluteString, forType: .string)
+                    }
+                }
+                if model.canEdit {
+                    Divider()
+                    Button(String(localized: "Unlink")) { model.unlink(item.object) }
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(item.label), \(item.ref.entity)")
+            .accessibilityLabel("\(item.label), \(item.object.entity)")
+            .accessibilityActions {
+                if model.canEdit { Button(String(localized: "Unlink")) { model.unlink(item.object) } }
+            }
         }
         .listStyle(.inset)
+        // Delete takes the selected object out of the relationship, as Delete Rows does in the grid; the object
+        // itself stays.
+        .onDeleteCommand {
+            if let item = model.selectedItem { model.unlink(item) }
+        }
         .accessibilityLabel(String(localized: "Related objects"))
     }
 }

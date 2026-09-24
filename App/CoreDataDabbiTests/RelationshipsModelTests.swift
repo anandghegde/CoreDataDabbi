@@ -68,7 +68,7 @@ import Testing
         let related = try #require(model.related)
         #expect(related.relationship == "employees")
         #expect(!related.items.isEmpty)
-        #expect(related.items.allSatisfy { ["Employee", "Manager"].contains($0.ref.entity) })
+        #expect(related.items.allSatisfy { ["Employee", "Manager"].contains($0.object.entity) })
         #expect(model.relatedError == nil)
     }
 
@@ -81,7 +81,7 @@ import Testing
         let related = try #require(model.related)
         #expect(related.relationship == "organisation")
         #expect(related.items.count == 1)
-        #expect(related.items.first?.ref.entity == "Organisation")
+        #expect(related.items.first?.object.entity == "Organisation")
         // The choice is the project's, so the panel opens on the same relationship next time.
         #expect(context.local.selection.relationship == "organisation")
     }
@@ -92,7 +92,7 @@ import Testing
 
         let source = try #require(context.navigation.current?.focus)
         let item = try #require(model.related?.items.first)
-        model.selectItem(item.ref)
+        model.selectItem(item.object)
 
         // The inspector and the content viewer follow the panel; the grid stays on the row it had (REL-1).
         #expect(context.inspectedRef == item.ref)
@@ -111,9 +111,9 @@ import Testing
         let label = try #require(model.sourceLabel)
         #expect(label.hasPrefix("Department"))
         let item = try #require(model.related?.items.first)
-        model.reveal(item.ref)
+        model.reveal(try #require(item.ref))
 
-        #expect(context.navigation.current?.entity == item.ref.entity)
+        #expect(context.navigation.current?.entity == item.object.entity)
         #expect(context.navigation.current?.focus == item.ref)
         #expect(context.inspectedRef == item.ref)
         #expect(context.navigation.current?.trail == [label, "employees"])
@@ -130,7 +130,7 @@ import Testing
 
         let department = try #require(model.sourceLabel)
         let employee = try #require(model.related?.items.first)
-        model.reveal(employee.ref)
+        model.reveal(try #require(employee.ref))
         model.refresh()
         await model.whenSettled()
 
@@ -138,7 +138,7 @@ import Testing
         model.select("department")
         await model.whenSettled()
         let back = try #require(model.related?.items.first)
-        model.reveal(back.ref)
+        model.reveal(try #require(back.ref))
         #expect(context.navigation.current?.trail == [department, "employees", "department"])
 
         // The first crumb names where the drilling started, and clicking it goes back there.
@@ -152,7 +152,7 @@ import Testing
         defer { context.shutDown() }
 
         let item = try #require(model.related?.items.first)
-        model.reveal(item.ref)
+        model.reveal(try #require(item.ref))
         #expect(context.navigation.current?.trail.count == 2)
 
         // The sidebar is not a relationship: landing on an entity leaves no trail behind it.

@@ -131,6 +131,30 @@ final class EditingSession {
         }
     }
 
+    /// Unlinks `objects` from `object`'s relationship `relationship`: out of a to-many, or a to-one emptied. The
+    /// objects themselves stay (EDT-3).
+    func unlink(_ objects: [PendingObjectID], from object: PendingObjectID, through relationship: String) {
+        guard !objects.isEmpty else { return }
+        let name = String(localized: "Unlink \(relationship)")
+        stage { try await $0.unlink(objects, from: object, through: relationship, actionName: name) }
+    }
+
+    /// Stages a new object of `entity` already linked to `object` through `relationship`, as one edit, and hands
+    /// `inserted` the identity it is staged under — once it is, and only if this session is still the one
+    /// attached.
+    func insertRelatedObject(
+        of entity: String, to object: PendingObjectID, through relationship: String,
+        inserted: (@MainActor (PendingObjectID) -> Void)? = nil
+    ) {
+        let name = String(localized: "New \(entity)")
+        stage { [weak self] session in
+            let (created, changes) = try await session.insertRelatedObject(
+                to: object, through: relationship, entity: entity, actionName: name)
+            if self?.session === session { inserted?(created) }
+            return changes
+        }
+    }
+
     /// Throws away everything staged. The file is not touched.
     func discard() {
         undoManager.removeAllActions(withTarget: self)

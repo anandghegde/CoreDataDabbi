@@ -364,9 +364,10 @@ public actor StoreSession {
                 // A set has no order of its own; object-ID order is what the grid shows, so the panel shows it
                 // too — and it means the first page of a relationship is the same every time it is opened.
                 // Everything a relationship can point at shares one table, so the key alone orders them all.
+                // Objects only inserted have no key yet, and come after the saved ones.
                 objects =
                     set.compactMap { $0 as? NSManagedObject }
-                    .map { (object: $0, pk: ObjectRef(uri: $0.objectID.uriRepresentation())?.pk ?? 0) }
+                    .map { (object: $0, pk: ObjectRef(uri: $0.objectID.uriRepresentation())?.pk ?? .max) }
                     .sorted { $0.pk < $1.pk }
                     .prefix(limit)
                     .map(\.object)
@@ -376,7 +377,7 @@ public actor StoreSession {
             return RelatedObjects(
                 relationship: name, destinationEntity: relationship.destinationEntity,
                 isToMany: relationship.isToMany, isOrdered: relationship.isOrdered, count: count,
-                items: objects.compactMap(converter.item), generation: generation)
+                items: objects.map(converter.item), generation: generation)
         }
     }
 
