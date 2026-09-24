@@ -7,6 +7,8 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
     private let panes: ProjectSplitViewController
     private let capsule: StatusCapsuleView
     private var observation: ObservationLoop?
+    /// The store went missing before the window was on screen: Project Settings waits for it (PRJ-12).
+    private var settingsPending = false
 
     init(context: ProjectContext) {
         self.context = context
@@ -45,7 +47,23 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         window.toolbar = toolbar
 
         capsule.onReload = { [weak self] in self?.reloadStore(nil) }
+        context.onStoreLost = { [weak self] in
+            self?.settingsPending = true
+            self?.showPendingSettings()
+        }
+        context.onEditingRefused = { [weak self] error in self?.explainRefusal(error) }
+        context.onLeavingChanges = { [weak self] decide in
+            guard let self else { return decide(.cancel) }
+            self.askAboutChanges(decide)
+        }
+        context.editing.onError = { [weak self] error in self?.explainEditError(error) }
+        context.snapshots.onError = { [weak self] error in self?.explainEditError(error) }
+        context.onStoreInUse = { [weak self] holders, canQuit, decide in
+            guard let self else { return decide(false) }
+            self.askToQuit(holders, canQuit: canQuit, decide)
+        }
         observation = ObservationLoop { [weak self] in self?.showStatus() }
+        changesObservation = ObservationLoop { [weak self] in self?.revealFirstChange() }
     }
 
     @available(*, unavailable)
@@ -60,7 +78,19 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
 
     // MARK: Window state
 
+    /// Store edits have an undo stack of their own, which the session keeps (EDT-8); the document has none.
+    func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? {
+        context.editing.undoManager
+    }
+
     func windowDidMove(_ notification: Notification) { rememberFrame() }
+
+    /// Coming back to the window is when a store that moved or went away is noticed (PRJ-12): the simulator was
+    /// erased, the app reinstalled, the file thrown away while the user was elsewhere.
+    func windowDidBecomeKey(_ notification: Notification) {
+        showPendingSettings()
+        context.checkReachability()
+    }
     func windowDidEndLiveResize(_ notification: Notification) { rememberFrame() }
 
     private func rememberFrame() {
@@ -70,7 +100,7 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
 
     // MARK: Commands
 
-    @IBAction func reloadStore(_ sender: Any?) { context.openStore() }
+    @IBAction func reloadStore(_ sender: Any?) { context.reloadStore() }
 
     @IBAction func revealStore(_ sender: Any?) {
         guard let url = context.storeURL else { return }
@@ -91,7 +121,220 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         }
     }
 
+    /// The store, the model and the time zone; and, when the store is lost, what was found and where it may be.
+    @IBAction func showProjectSettings(_ sender: Any?) {
+        settingsPending = false
+        guard let window, window.attachedSheet == nil, let content = window.contentViewController else { return }
+        content.presentAsSheet(ProjectSettingsController(context: context))
+    }
+
+    private func showPendingSettings() {
+        guard settingsPending, let window, window.isVisible else { return }
+        showProjectSettings(nil)
+    }
+
     @IBAction func toggleBottomPanel(_ sender: Any?) { panes.centre.toggle(Pane.bottom) }
+
+    // MARK: Staged edits (EDT-8)
+
+    private var changesObservation: ObservationLoop?
+    private var hadChanges = false
+
+    /// Writes what is staged to the store, after the session's backup (EDT-9).
+    @IBAction func commitChanges(_ sender: Any?) { context.editing.commit() }
+
+    /// Throws away what is staged, after asking: it cannot be undone.
+    @IBAction func discardChanges(_ sender: Any?) {
+        guard let window, context.editing.hasChanges else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Discard all pending changes?")
+        alert.informativeText = String(localized: "The store stays as it is. This cannot be undone.")
+        alert.addButton(withTitle: String(localized: "Discard"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.buttons[0].hasDestructiveAction = true
+        alert.beginSheetModal(for: window) { [context] response in
+            guard response == .alertFirstButtonReturn else { return }
+            context.editing.discard()
+        }
+    }
+
+    /// Stages the deletion of the rows selected in the grid.
+    @IBAction func deleteObjects(_ sender: Any?) {
+        context.editing.delete(panes.centre.browse.grid.selectedObjects.map(PendingObjectID.init))
+    }
+
+    @IBAction func togglePendingChanges(_ sender: Any?) {
+        let bottom = panes.centre.bottom
+        if panes.centre.item(for: Pane.bottom)?.isCollapsed == true
+            || bottom.item(for: Pane.changes)?.isCollapsed == true
+        {
+            _ = panes.reveal(pane: Pane.changes)
+        } else {
+            bottom.toggle(Pane.changes)
+        }
+    }
+
+    /// The first edit opens the panel it is listed in, so that staging something is never invisible. After
+    /// that the panel is where the user leaves it.
+    private func revealFirstChange() {
+        let hasChanges = context.editing.hasChanges
+        defer { hadChanges = hasChanges }
+        guard hasChanges, !hadChanges, window?.isVisible == true else { return }
+        _ = panes.reveal(pane: Pane.changes)
+    }
+
+    /// Asked before something that would lose staged edits: Commit, Discard or Cancel.
+    private func askAboutChanges(_ decide: @escaping @MainActor (LeavingChanges) -> Void) {
+        guard let window, window.attachedSheet == nil else { return decide(.cancel) }
+        let count = context.editing.changes.changes.count
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Commit the pending changes first?")
+        alert.informativeText = String(
+            localized:
+                "\(count) objects have changes that are not in the store yet. Discarded changes cannot be recovered.")
+        alert.addButton(withTitle: String(localized: "Commit"))
+        alert.addButton(withTitle: String(localized: "Discard"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.buttons[1].hasDestructiveAction = true
+        alert.beginSheetModal(for: window) { response in
+            switch response {
+            case .alertFirstButtonReturn: decide(.commit)
+            case .alertSecondButtonReturn: decide(.discard)
+            default: decide(.cancel)
+            }
+        }
+    }
+
+    /// An edit was refused, or a commit: nothing was staged or written by it, and what was staged still is.
+    private func explainEditError(_ error: DabbiError) {
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = error.message
+        alert.informativeText = (error.diagnosis + error.recovery).joined(separator: "\n")
+        if window.attachedSheet == nil {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
+    }
+
+    // MARK: Snapshots (§7.3)
+
+    /// Asks for a name and a note, and copies the store as it is on disk.
+    @IBAction func takeSnapshot(_ sender: Any?) {
+        guard context.snapshots.canTake, let window, window.attachedSheet == nil,
+            let content = window.contentViewController
+        else { return }
+        let model = SnapshotSheet.Model(
+            title: String(localized: "Take a Snapshot"), confirmTitle: String(localized: "Take Snapshot"),
+            name: SnapshotsSession.defaultName(at: .now), note: "", editsName: true)
+        let sheet = SnapshotSheetController(model)
+        model.onFinish = { [weak self, weak sheet] answer in
+            if let sheet { content.dismiss(sheet) }
+            guard let self, let (name, note) = answer else { return }
+            self.context.takeSnapshot(name: name, note: note)
+            _ = self.panes.reveal(pane: Pane.sidebar)
+        }
+        content.presentAsSheet(sheet)
+    }
+
+    /// The snapshot a sidebar menu item stands for.
+    private func snapshot(for sender: Any?) -> SnapshotManifest? {
+        ((sender as? NSMenuItem)?.representedObject as? UUID).flatMap(context.snapshots.snapshot(_:))
+    }
+
+    /// Puts a snapshot back in place of the store, after saying what that does.
+    @IBAction func restoreSnapshot(_ sender: Any?) {
+        guard let snapshot = snapshot(for: sender), context.canRestore, let window, window.attachedSheet == nil
+        else { return }
+        let alert = NSAlert()
+        alert.messageText = String(localized: "Restore “\(snapshot.name)”?")
+        alert.informativeText = String(
+            localized:
+                "The store is replaced by the snapshot taken \(snapshot.createdAt.formatted(date: .abbreviated, time: .shortened)). A backup of the store as it is now is taken first, and listed with the snapshots."
+        )
+        alert.addButton(withTitle: String(localized: "Restore"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.buttons[0].hasDestructiveAction = true
+        alert.beginSheetModal(for: window) { [context] response in
+            guard response == .alertFirstButtonReturn else { return }
+            context.restore(snapshot)
+        }
+    }
+
+    @IBAction func editSnapshotNote(_ sender: Any?) {
+        guard let snapshot = snapshot(for: sender), let window, window.attachedSheet == nil,
+            let content = window.contentViewController
+        else { return }
+        let model = SnapshotSheet.Model(
+            title: String(localized: "Edit Note"), confirmTitle: String(localized: "Save"),
+            name: snapshot.name, note: snapshot.note, editsName: false)
+        let sheet = SnapshotSheetController(model)
+        model.onFinish = { [weak self, weak sheet] answer in
+            if let sheet { content.dismiss(sheet) }
+            guard let (_, note) = answer else { return }
+            self?.context.snapshots.setNote(note, of: snapshot.id)
+        }
+        content.presentAsSheet(sheet)
+    }
+
+    @IBAction func deleteSnapshot(_ sender: Any?) {
+        guard let snapshot = snapshot(for: sender), let window, window.attachedSheet == nil else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Delete “\(snapshot.name)”?")
+        alert.informativeText = String(localized: "The copy of the store is thrown away. This cannot be undone.")
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.buttons[0].hasDestructiveAction = true
+        alert.beginSheetModal(for: window) { [context] response in
+            guard response == .alertFirstButtonReturn else { return }
+            context.snapshots.delete(snapshot.id)
+        }
+    }
+
+    /// Other processes have the store open: name them, and offer to quit them when there is a way to.
+    private func askToQuit(_ holders: [LiveProcess], canQuit: Bool, _ decide: @escaping @MainActor (Bool) -> Void) {
+        guard let window, window.attachedSheet == nil else { return decide(false) }
+        let names = holders.map(\.name).joined(separator: ", ")
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "The store is open in \(names)")
+        alert.informativeText =
+            canQuit
+            ? String(
+                localized: "A snapshot cannot be restored while another app has the store open. Quit it, then restore?")
+            : String(
+                localized:
+                    "A snapshot cannot be restored while another process has the store open. Quit it, then try again.")
+        if canQuit {
+            alert.addButton(withTitle: String(localized: "Quit and Restore"))
+            alert.addButton(withTitle: String(localized: "Cancel"))
+            alert.buttons[0].hasDestructiveAction = true
+        } else {
+            alert.addButton(withTitle: String(localized: "OK"))
+        }
+        alert.beginSheetModal(for: window) { response in
+            decide(canQuit && response == .alertFirstButtonReturn)
+        }
+    }
+
+    // MARK: Access mode (EDT-1)
+
+    /// The lock: read-only ↔ editable. The store is reopened the other way, keeping the place.
+    @IBAction func toggleAccessMode(_ sender: Any?) { context.toggleAccessMode() }
+
+    /// The store could not be opened for editing; it is open read-only again.
+    private func explainRefusal(_ error: DabbiError) {
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "This store cannot be edited")
+        alert.informativeText = (error.diagnosis + error.recovery).joined(separator: "\n")
+        alert.beginSheetModal(for: window)
+    }
 
     // MARK: Tracking (TRK-1, TRK-9)
 
@@ -170,8 +413,28 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         switch item.action {
         case #selector(reloadStore(_:)):
             return context.project.store != nil
+        case #selector(commitChanges(_:)):
+            return context.editing.canCommit
+        case #selector(discardChanges(_:)):
+            return context.editing.hasChanges && !context.editing.isCommitting
+        case #selector(deleteObjects(_:)):
+            // Only from the grid: elsewhere ⌘⌫ is the text field's, deleting to the start of the line.
+            return context.editing.isEditable && window?.firstResponder === panes.centre.browse.grid.tableView
+                && !context.tracking.isShowingLog && !panes.centre.browse.grid.selectedObjects.isEmpty
+        case #selector(togglePendingChanges(_:)):
+            let shown =
+                panes.centre.item(for: Pane.bottom)?.isCollapsed == false
+                && panes.centre.bottom.item(for: Pane.changes)?.isCollapsed == false
+            item.title = shown ? String(localized: "Hide Pending Changes") : String(localized: "Show Pending Changes")
+            return true
         case #selector(revealStore(_:)):
             return context.storeURL != nil
+        case #selector(takeSnapshot(_:)):
+            return context.snapshots.canTake
+        case #selector(restoreSnapshot(_:)):
+            return context.canRestore
+        case #selector(editSnapshotNote(_:)), #selector(deleteSnapshot(_:)):
+            return !context.snapshots.isBusy
         case #selector(toggleBottomPanel(_:)):
             let isCollapsed = panes.centre.item(for: Pane.bottom)?.isCollapsed ?? false
             item.title =
@@ -197,6 +460,9 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
             return context.navigation.canGoForward
         case #selector(revealInEntity(_:)):
             return panes.centre.bottom.relationships.model.canReveal
+        case #selector(toggleAccessMode(_:)):
+            item.title = Self.accessTitle(for: context.accessMode)
+            return context.canChangeAccessMode
         case #selector(toggleTracking(_:)):
             item.title =
                 context.tracking.isRunning
@@ -222,7 +488,7 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
             .toggleSidebar, .sidebarTrackingSeparator, .navigation, .flexibleSpace, .statusCapsule, .flexibleSpace,
-            .inspectorTrackingSeparator, .tracking, .flexibleSpace, .toggleInspector,
+            .inspectorTrackingSeparator, .accessMode, .tracking, .flexibleSpace, .toggleInspector,
         ]
     }
 
@@ -259,6 +525,14 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
             item.view = capsule
             item.visibilityPriority = .high
             return item
+        case .accessMode:
+            let item = NSToolbarItem(itemIdentifier: identifier)
+            item.target = self
+            item.action = #selector(toggleAccessMode(_:))
+            item.autovalidates = false
+            accessItem = item
+            showAccessMode()
+            return item
         case .tracking:
             let item = NSToolbarItem(itemIdentifier: identifier)
             item.label = String(localized: "Track Changes")
@@ -275,6 +549,8 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
 
     private var navigationGroup: NSToolbarItemGroup?
     private var navigationObservation: ObservationLoop?
+    private var accessItem: NSToolbarItem?
+    private var accessObservation: ObservationLoop?
     private var trackingItem: NSToolbarItem?
     private var trackingObservation: ObservationLoop?
 
@@ -297,6 +573,31 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         }
     }
 
+    /// What the lock does next, as a menu item or a button title says it.
+    static func accessTitle(for mode: AccessMode?) -> String {
+        mode == .editable ? String(localized: "Lock Store") : String(localized: "Allow Editing")
+    }
+
+    /// A closed padlock while the store is read-only, an open one while it is editable — the symbol says what
+    /// the store is, the label and tooltip what a click does (§8.4).
+    private func showAccessMode() {
+        accessObservation = ObservationLoop { [weak self] in
+            guard let self, let item = self.accessItem else { return }
+            let mode = self.context.accessMode
+            let editable = mode == .editable
+            let title = Self.accessTitle(for: mode)
+            item.image = NSImage(
+                systemSymbolName: editable ? "lock.open.fill" : "lock.fill",
+                accessibilityDescription: editable ? String(localized: "Editable") : String(localized: "Read-only"))
+            item.label = title
+            item.toolTip =
+                editable
+                ? String(localized: "The store is editable. Click to make it read-only.")
+                : String(localized: "The store is read-only. Click to allow editing.")
+            item.isEnabled = self.context.canChangeAccessMode
+        }
+    }
+
     @objc private func navigate(_ sender: NSToolbarItemGroup) {
         sender.selectedIndex == 0 ? goBack(sender) : goForward(sender)
     }
@@ -314,4 +615,5 @@ extension NSToolbarItem.Identifier {
     static let navigation = NSToolbarItem.Identifier("org.coredatadabbi.navigation")
     static let statusCapsule = NSToolbarItem.Identifier("org.coredatadabbi.status")
     static let tracking = NSToolbarItem.Identifier("org.coredatadabbi.tracking")
+    static let accessMode = NSToolbarItem.Identifier("org.coredatadabbi.accessMode")
 }

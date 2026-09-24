@@ -19,16 +19,25 @@ public actor StoreSession {
     let reader: SQLiteReader
     private var pagers: [UUID: Pager] = [:]
     private var isClosed = false
+    /// Objects inserted in the edit context, by their temporary URI: the coordinator cannot resolve those.
+    /// Not `private`: staging is an extension in its own file (`StagedEdits.swift`).
+    var insertedObjectIDs: [URL: NSManagedObjectID] = [:]
 
     // MARK: Opening
 
-    /// Opens the store at `storeURL` read-only.
+    /// Opens the store at `storeURL`, read-only unless `access` says otherwise.
     ///
-    /// - Parameter modelURL: a `.mom`, a `.momd`, or an app bundle to find the model in. Without it the model
-    ///   cached inside the store is used.
-    public static func open(storeURL: URL, modelURL: URL? = nil) async throws -> StoreSession {
+    /// - Parameters:
+    ///   - modelURL: a `.mom`, a `.momd`, or an app bundle to find the model in. Without it the model cached
+    ///     inside the store is used.
+    ///   - access: `.editable` opens the store for writing (EDT-1). It is refused with `.storeNotWritable`
+    ///     before Core Data is asked, when the file, its folder or its companions cannot be written.
+    public static func open(
+        storeURL: URL, modelURL: URL? = nil, access: StoreAccess = .readOnly
+    ) async throws -> StoreSession {
         let storeURL = storeURL.standardizedFileURL
-        _ = try SQLiteHeader.read(from: storeURL)
+        let header = try SQLiteHeader.read(from: storeURL)
+        if access.mode == .editable { try checkWritable(storeURL) }
         let reader = try SQLiteReader(url: storeURL)
         do {
             let probe = try await reader.read { try FormatProbe.probe($0) }
@@ -47,15 +56,40 @@ public actor StoreSession {
             // `no such table: ATRANSACTION` and a page of Core Data's console noise (spike S7).
             let stack = try CoreDataStack(
                 model: try ModelSanitiser.sanitised(loaded.model), description: description, storeURL: storeURL,
-                tracksHistory: probe.hasHistory)
+                tracksHistory: probe.hasHistory, access: access, keepsWAL: header.isWAL)
             let info = StoreInfo(
-                url: storeURL, accessMode: .readOnly, model: description, modelSource: loaded.source,
+                url: storeURL, accessMode: access.mode, model: description, modelSource: loaded.source,
                 metadata: metadata, probe: probe, schemaMap: schemaMap)
             return StoreSession(info: info, stack: stack, reader: reader)
         } catch {
             await reader.close()
             throw error
         }
+    }
+
+    /// Whether an editable open can write everything it has to: the store, the folder its journal or log is
+    /// created in, and the log and shared memory when they are there already.
+    ///
+    /// Core Data would find out too, at the first save or not at all — a store whose folder is read-only opens
+    /// happily and fails when the journal cannot be made. Asking first is what lets the lock say no at once.
+    private static func checkWritable(_ storeURL: URL) throws {
+        let files = FileManager.default
+        let folder = storeURL.deletingLastPathComponent()
+        let companions = ["-wal", "-shm"].map { URL(fileURLWithPath: storeURL.path + $0) }
+        let unwritable =
+            ([storeURL, folder] + companions.filter { files.fileExists(atPath: $0.path) })
+            .filter { !files.isWritableFile(atPath: $0.path) }
+        guard let first = unwritable.first else { return }
+        throw DabbiError(
+            .storeNotWritable, "The store cannot be edited where it is.",
+            arguments: ["path": storeURL.path],
+            diagnosis: unwritable.map { "\($0.lastPathComponent) cannot be written to." },
+            recovery: [
+                first == folder
+                    ? "Copy the store to a folder you can write to, and open the copy."
+                    : "Check the file's permissions in the Finder's Get Info window.",
+                "Keep browsing read-only: nothing is lost.",
+            ])
     }
 
     private init(info: StoreInfo, stack: CoreDataStack, reader: SQLiteReader) {
@@ -120,7 +154,11 @@ public actor StoreSession {
         let window = spec.limit.map { (offset: 0, limit: max(0, $0) + 1) }
         let request = try fetchRequest(for: spec, resultType: NSManagedObjectID.self, window: window)
         let failure: DabbiError.Code = spec.predicate == nil ? .fetchFailed : .invalidPredicate
-        var ids = try await stack.perform { try CoreDataStack.fetch(request.value, in: $0, failure: failure) }
+        // An editable session's fetches include what is staged. An object that is only inserted has a temporary
+        // identity and no reference yet, so it has no row to show; it is listed with the pending changes.
+        var ids = try await stack.perform {
+            try CoreDataStack.fetch(request.value, in: $0, failure: failure).filter { !$0.isTemporaryID }
+        }
         try ensureOpen()
         let hasMore = spec.limit.map { ids.count > max(0, $0) } ?? false
         if hasMore { ids.removeLast() }
@@ -143,7 +181,9 @@ public actor StoreSession {
         let offset = pager.ids.count
         let request = try fetchRequest(
             for: handle.spec, resultType: NSManagedObjectID.self, window: (offset: offset, limit: batch + 1))
-        var more = try await stack.perform { try CoreDataStack.fetch(request.value, in: $0) }
+        var more = try await stack.perform {
+            try CoreDataStack.fetch(request.value, in: $0).filter { !$0.isTemporaryID }
+        }
 
         // The actor was free during the fetch: the pager may be gone, or somebody else may have extended it.
         var current = try self.pager(for: handle)
@@ -318,7 +358,7 @@ public actor StoreSession {
         }
     }
 
-    private func objectID(for ref: ObjectRef) throws -> NSManagedObjectID {
+    func objectID(for ref: ObjectRef) throws -> NSManagedObjectID {
         try ensureOpen()
         guard let id = stack.objectID(for: ref) else {
             throw DabbiError(
@@ -328,7 +368,7 @@ public actor StoreSession {
         return id
     }
 
-    private static func existingObject(
+    static func existingObject(
         _ id: NSManagedObjectID, ref: ObjectRef, in context: NSManagedObjectContext
     ) throws -> NSManagedObject {
         do {

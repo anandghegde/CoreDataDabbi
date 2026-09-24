@@ -79,5 +79,9 @@ public enum SQLiteBackup {
         }
         try target.execute("PRAGMA journal_mode = DELETE")
         succeeded = true
+        // A copy of a WAL database was in WAL mode until the line above, and the system's SQLite leaves the -shm
+        // behind when the connection closes (as in `consolidate`). Without a log it means nothing.
+        target.close()
+        for suffix in ["-shm", "-wal"] { try? FileManager.default.removeItem(atPath: destination.path + suffix) }
     }
 }

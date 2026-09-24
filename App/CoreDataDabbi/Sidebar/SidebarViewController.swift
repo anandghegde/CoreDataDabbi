@@ -22,6 +22,7 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
     /// What the tree was built from; rebuilt only when the model or the saved predicates change.
     private var builtFrom: ModelDescription?
     private var builtPredicates: [SavedPredicate] = []
+    private var builtSnapshots: [SnapshotManifest] = []
     private var loop: ObservationLoop?
     /// Set while the outline view is being brought in line with the context, so that the change does not go
     /// back out as a click.
@@ -101,17 +102,21 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
     private func observe() {
         let model = context.model
         let predicates = context.savedPredicates
+        let snapshots = context.snapshots.snapshots
         let counts = context.entityCounts
         let selected = context.navigation.current
 
-        if model != builtFrom || predicates != builtPredicates {
+        if model != builtFrom || predicates != builtPredicates || snapshots != builtSnapshots {
             builtFrom = model
             builtPredicates = predicates
+            builtSnapshots = snapshots
             // Checked here, against the model the store was opened with, so that a predicate the model has
             // moved away from says so as soon as the project is open (PRD-5).
             tree =
-                model.map { SidebarNode.tree(of: $0, savedPredicates: predicates.map { ($0, context.check($0)) }) }
-                ?? []
+                model.map {
+                    SidebarNode.tree(
+                        of: $0, savedPredicates: predicates.map { ($0, context.check($0)) }, snapshots: snapshots)
+                } ?? []
             applyFilter()
         }
         refreshCounts(counts)
@@ -261,9 +266,16 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
             menu.addItem(item)
             return
         }
+        if let snapshot = targetSnapshot {
+            addSnapshotItems(for: snapshot, to: menu)
+            return
+        }
         guard let id = targetPredicate else { return }
         for (title, action) in [
-            (String(localized: "Rename", comment: "Saved predicate context menu"), #selector(renamePredicate(_:))),
+            (
+                String(localized: "Rename", comment: "Sidebar context menu, on a saved predicate or a snapshot"),
+                #selector(renamePredicate(_:))
+            ),
             (
                 String(localized: "Duplicate", comment: "Saved predicate context menu"),
                 #selector(duplicatePredicate(_:))
@@ -315,6 +327,78 @@ final class SidebarViewController: NSViewController, NSOutlineViewDataSource, NS
             self?.context.rename(savedPredicate: id, to: name)
             self?.view.window?.makeFirstResponder(self?.outlineView)
         }
+    }
+
+    // MARK: Snapshots (§7.3)
+
+    /// The snapshot a context menu was opened on.
+    private var targetSnapshot: SnapshotManifest? {
+        (outlineView.item(atRow: outlineView.clickedRow) as? SidebarNode)?.snapshot
+    }
+
+    /// Restoring, editing the note and deleting ask the window, which has the sheets and the alerts.
+    private func addSnapshotItems(for snapshot: SnapshotManifest, to menu: NSMenu) {
+        let restore = NSMenuItem(
+            title: String(localized: "Restore…", comment: "Snapshot context menu"),
+            action: #selector(ProjectWindowController.restoreSnapshot(_:)), keyEquivalent: "")
+        let rename = NSMenuItem(
+            title: String(localized: "Rename", comment: "Sidebar context menu, on a saved predicate or a snapshot"),
+            action: #selector(renameSnapshot(_:)), keyEquivalent: "")
+        rename.target = self
+        let note = NSMenuItem(
+            title: String(localized: "Edit Note…", comment: "Snapshot context menu"),
+            action: #selector(ProjectWindowController.editSnapshotNote(_:)), keyEquivalent: "")
+        let reveal = NSMenuItem(
+            title: String(localized: "Show in Finder", comment: "Snapshot context menu"),
+            action: #selector(revealSnapshot(_:)), keyEquivalent: "")
+        reveal.target = self
+        let delete = NSMenuItem(
+            title: String(localized: "Delete…", comment: "Snapshot context menu"),
+            action: #selector(ProjectWindowController.deleteSnapshot(_:)), keyEquivalent: "")
+        for item in [restore, rename, note, reveal, delete] {
+            item.representedObject = snapshot.id
+            menu.addItem(item)
+        }
+        menu.insertItem(.separator(), at: 1)
+        menu.insertItem(.separator(), at: menu.items.count - 1)
+    }
+
+    @objc private func renameSnapshot(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        beginRenaming(snapshot: id)
+    }
+
+    @objc private func revealSnapshot(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID, let snapshot = context.snapshots.snapshot(id),
+            let library = context.snapshots.library
+        else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([library.databaseURL(of: snapshot)])
+    }
+
+    /// Puts a snapshot's name into editing in place, as a saved predicate's is.
+    func beginRenaming(snapshot id: UUID) {
+        observe()
+        if !shown.flatMap({ $0.flattened() }).contains(where: { $0.snapshot?.id == id }) { filter(by: "") }
+        guard let node = shown.flatMap({ $0.flattened() }).first(where: { $0.snapshot?.id == id }) else { return }
+        let row = outlineView.row(forItem: node)
+        guard row >= 0 else { return }
+        outlineView.scrollRowToVisible(row)
+        guard let cell = outlineView.view(atColumn: 0, row: row, makeIfNecessary: true) as? SidebarCellView else {
+            return
+        }
+        cell.beginEditing { [weak self] name in
+            self?.context.snapshots.rename(id, to: name)
+            self?.view.window?.makeFirstResponder(self?.outlineView)
+        }
+    }
+
+    /// The cell a snapshot is shown in, for the tests.
+    func cell(forSnapshot id: UUID) -> SidebarCellView? {
+        guard let node = shown.flatMap({ $0.flattened() }).first(where: { $0.snapshot?.id == id }) else {
+            return nil
+        }
+        let row = outlineView.row(forItem: node)
+        return row < 0 ? nil : outlineView.view(atColumn: 0, row: row, makeIfNecessary: true) as? SidebarCellView
     }
 
     // MARK: Data source
@@ -480,10 +564,30 @@ final class SidebarCellView: NSTableCellView, NSTextFieldDelegate {
                         localized: "Missing \(missing)",
                         comment: "Saved predicate warning badge; the key paths the model no longer has"))
             warning.setAccessibilityElement(true)
+        case .snapshot(let manifest):
+            // A backup is the app's: the same copy, with the clock that says when it was taken.
+            let symbol = manifest.kind == .backup ? "clock.arrow.circlepath" : "camera"
+            icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+            name.textColor = .labelColor
+            toolTip = Self.describe(manifest)
         case .group:
             icon.image = nil
             toolTip = nil
         }
+    }
+
+    /// When, what kind, how big, and the note.
+    static func describe(_ manifest: SnapshotManifest) -> String {
+        let when = manifest.createdAt.formatted(date: .abbreviated, time: .standard)
+        let size = ByteCountFormatter.string(fromByteCount: manifest.totalBytes, countStyle: .file)
+        var lines = [
+            manifest.kind == .backup
+                ? String(localized: "Backup taken \(when)", comment: "Snapshot tooltip; the argument is a date")
+                : String(localized: "Snapshot taken \(when)", comment: "Snapshot tooltip; the argument is a date"),
+            size,
+        ]
+        if !manifest.note.isEmpty { lines.append(manifest.note) }
+        return lines.joined(separator: "\n")
     }
 
     // MARK: Renaming

@@ -57,6 +57,40 @@ final class ProjectDocument: NSDocument {
         context.openStoreIfNeeded()
     }
 
+    /// Staged edits are not the document's, so `NSDocument` does not know to ask about them: the window asks
+    /// whether to commit or discard them before it closes, or the app quits (EDT-8).
+    override func canClose(
+        withDelegate delegate: Any, shouldClose shouldCloseSelector: Selector?, contextInfo: UnsafeMutableRawPointer?
+    ) {
+        guard context.editing.hasChanges else {
+            super.canClose(withDelegate: delegate, shouldClose: shouldCloseSelector, contextInfo: contextInfo)
+            return
+        }
+        let delegate = delegate as AnyObject
+        context.leaveChanges(
+            { [weak self] in
+                self?.canCloseAfterChanges(delegate: delegate, selector: shouldCloseSelector, contextInfo: contextInfo)
+            },
+            cancelled: { [weak self] in
+                guard let self, let shouldCloseSelector else { return }
+                Self.answer(delegate, shouldCloseSelector, self, false, contextInfo)
+            })
+    }
+
+    private func canCloseAfterChanges(delegate: AnyObject, selector: Selector?, contextInfo: UnsafeMutableRawPointer?) {
+        super.canClose(withDelegate: delegate, shouldClose: selector, contextInfo: contextInfo)
+    }
+
+    /// `document:shouldClose:contextInfo:`, the old-fashioned way AppKit asks for it.
+    private static func answer(
+        _ delegate: AnyObject, _ selector: Selector, _ document: NSDocument, _ shouldClose: Bool,
+        _ contextInfo: UnsafeMutableRawPointer?
+    ) {
+        typealias Callback = @convention(c) (AnyObject, Selector, NSDocument, Bool, UnsafeMutableRawPointer?) -> Void
+        guard let method = delegate.method(for: selector) else { return }
+        unsafeBitCast(method, to: Callback.self)(delegate, selector, document, shouldClose, contextInfo)
+    }
+
     override func close() {
         context.shutDown()
         super.close()

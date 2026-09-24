@@ -114,6 +114,8 @@ let package = Package(
             dependencies: ["DabbiTracking", "DabbiStore", "DabbiModel", "DabbiSQLite", "DabbiTestSupport"]),
         .testTarget(name: "DabbiContentTests", dependencies: ["DabbiContent", "ContentFuzzKit"]),
         .testTarget(name: "DabbiProjectTests", dependencies: ["DabbiProject"]),
+        .testTarget(
+            name: "DabbiSnapshotsTests", dependencies: ["DabbiSnapshots", "DabbiStore", "DabbiTestSupport"]),
         .testTarget(name: "DabbiLocatorTests", dependencies: ["DabbiLocator", "DabbiTestSupport"]),
         .testTarget(name: "DabbiKitTests", dependencies: ["DabbiKit", "DabbiTestSupport"]),
         .testTarget(name: "FixtureKitTests", dependencies: ["FixtureKit", "DabbiTestSupport"]),

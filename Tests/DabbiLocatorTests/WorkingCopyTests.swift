@@ -46,10 +46,10 @@ import Testing
 
     @Test func takesTheExternalDataAlong() throws {
         let original = try TestFixtures.location(.externalData)
-        let support = WorkingCopy.externalDataFolder(of: original.storeURL)
+        let support = StoreFiles.supportFolder(of: original.storeURL)
         try #require(FileManager.default.fileExists(atPath: support.path))
         let copy = try WorkingCopy.make(of: original.storeURL, in: workFolder())
-        let copied = WorkingCopy.externalDataFolder(of: copy.url)
+        let copied = StoreFiles.supportFolder(of: copy.url)
         #expect(try listing(copied) == (try listing(support)))
     }
 

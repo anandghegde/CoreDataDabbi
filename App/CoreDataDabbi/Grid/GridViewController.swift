@@ -25,6 +25,10 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     private var shownFilter: PredicateSource?
     private var shownCap: Int?
     private var shownSession: ObjectIdentifier?
+    /// Staged edits as last read (EDT-8): a new revision re-reads the rows, a new commit reopens the pager —
+    /// the session is in a new generation, and the old pager is stale.
+    private var shownRevision = 0
+    private var shownCommits = 0
     /// Bumped per open; a pager that arrives after another open started is dropped.
     private var openAttempt = 0
     /// Only so that a test can wait for the rows the user simply watches arrive.
@@ -123,11 +127,15 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         let cap = location?.fetchRequest?.limit
         // Reading the time zone here means changing it redraws the grid.
         _ = context.timeZone
+        let revision = context.editing.revision
+        let commits = context.editing.commits
 
         let identity = session.map(ObjectIdentifier.init)
         if location?.entity != shownEntity || location?.savedPredicate != shownPredicate || sort != shownSort
-            || filter != shownFilter || cap != shownCap || identity != shownSession
+            || filter != shownFilter || cap != shownCap || identity != shownSession || commits != shownCommits
         {
+            shownCommits = commits
+            shownRevision = revision
             shownEntity = location?.entity
             shownPredicate = location?.savedPredicate
             shownSort = sort
@@ -135,6 +143,9 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
             shownCap = cap
             shownSession = identity
             open(entity: location?.entity, sort: sort, filter: filter, in: session)
+        } else if revision != shownRevision {
+            shownRevision = revision
+            rows?.reload()
         } else {
             reloadVisibleCells()
         }
@@ -421,6 +432,11 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
                 return GridValue.render(snapshot.values[index], timeZone: context.timeZone)
             }
         }
+    }
+
+    /// The selected rows' objects, in the grid's order. Rows not read yet, or deleted, are not among them.
+    var selectedObjects: [ObjectRef] {
+        tableView.selectedRowIndexes.compactMap(reference(at:))
     }
 
     private func reference(at row: Int) -> ObjectRef? {

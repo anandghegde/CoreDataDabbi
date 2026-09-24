@@ -49,7 +49,12 @@ public struct StoreOpener: Sendable {
     }
 
     /// Opens the store of a project.
-    public func open(_ location: StoreLocation, model: ModelReference = .storeCache) async throws -> OpenedStore {
+    ///
+    /// `access` is the project's access mode (EDT-1). An editable store is opened where it is or not at all: a
+    /// working copy would take the edits and throw them away.
+    public func open(
+        _ location: StoreLocation, model: ModelReference = .storeCache, access: StoreAccess = .readOnly
+    ) async throws -> OpenedStore {
         let storeURL = try resolver.resolve(location)
         var modelURL: URL?
         if case .file(let reference) = model {
@@ -62,21 +67,21 @@ public struct StoreOpener: Sendable {
             modelURL = url
         }
         do {
-            return try await open(storeURL: storeURL, modelURL: modelURL)
+            return try await open(storeURL: storeURL, modelURL: modelURL, access: access)
         } catch let error as DabbiError where error.code == .modelCacheMissing && modelURL == nil {
             // The app that owns the store is right there, with its model in it — unless it is a SwiftData app,
             // in which case there is no model to be had and the first error is the one to show.
             guard let bundle = appBundle(of: location), !SwiftDataConventions.shipsNoModel(bundle) else { throw error }
-            return try await open(storeURL: storeURL, modelURL: bundle)
+            return try await open(storeURL: storeURL, modelURL: bundle, access: access)
         }
     }
 
     /// Opens a store file.
-    public func open(storeURL: URL, modelURL: URL? = nil) async throws -> OpenedStore {
+    public func open(storeURL: URL, modelURL: URL? = nil, access: StoreAccess = .readOnly) async throws -> OpenedStore {
         do {
-            let session = try await StoreSession.open(storeURL: storeURL, modelURL: modelURL)
+            let session = try await StoreSession.open(storeURL: storeURL, modelURL: modelURL, access: access)
             return OpenedStore(session: session, storeURL: storeURL, workingCopy: nil, modelURL: modelURL)
-        } catch  where WorkingCopy.helps(with: error) {
+        } catch  where access.mode == .readOnly && WorkingCopy.helps(with: error) {
             DabbiLog.logger(.locator).notice("store cannot be read in place; opening a working copy")
             let directory = workingCopiesDirectory
             let copy = try await Task.detached(priority: .userInitiated) {

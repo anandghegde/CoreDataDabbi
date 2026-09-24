@@ -1,0 +1,229 @@
+import DabbiKit
+import Foundation
+import Observation
+
+/// One window's staged edits: what is waiting to be committed, the undo stack the Edit menu drives, and Commit
+/// and Discard (EDT-8).
+///
+/// The window's side of the session's edit context. Every staged edit, undo and commit goes to the session in
+/// the order the user asked for it — each waits for the one before, as tracking's buttons do — and what comes
+/// back is the whole of what is staged, which is what the Pending Changes panel and the grid read.
+///
+/// The session keeps the real undo stack; `undoManager` mirrors it for the window, one entry per staged edit,
+/// so that ⌘Z, the Edit menu's titles and the text fields' own undo all go through the one manager AppKit
+/// expects. An entry is registered only once the session says the edit added one to its stack
+/// (`PendingChanges.undoDepth`): an edit that changed nothing, or was refused, leaves nothing to undo.
+///
+/// It does not know the project context, which hands it a session and a backup, so the tests can drive it
+/// against a fixture without a window.
+@MainActor
+@Observable
+final class EditingSession {
+    /// Everything staged, and where the session's undo stack stands.
+    private(set) var changes: PendingChanges = .none
+    /// Bumped whenever what is staged may have changed, so that the grid re-reads its rows.
+    private(set) var revision = 0
+    /// Bumped by each commit that wrote something: the session is in a new generation, and every pager is stale.
+    private(set) var commits = 0
+    private(set) var isCommitting = false
+    /// What the last commit wrote.
+    private(set) var lastCommit: CommitSummary?
+    /// The last thing that went wrong: a value refused, a commit refused. The window shows it as it happens.
+    private(set) var lastError: DabbiError?
+
+    /// Something the user asked for could not be done. Nothing was staged or written by it.
+    @ObservationIgnored var onError: ((DabbiError) -> Void)?
+    /// A commit is over, written or not: the first one of a session will have taken a backup either way.
+    @ObservationIgnored var onCommitFinished: (() -> Void)?
+
+    /// The window's undo manager while the store is editable. Grouped by event, as AppKit's own are, so the text
+    /// fields' typing can share it.
+    @ObservationIgnored let undoManager = UndoManager()
+
+    @ObservationIgnored private var session: StoreSession?
+    @ObservationIgnored private var backup: PreCommitBackup?
+    /// The last operation sent to the session.
+    @ObservationIgnored private var control: Task<Void, Never>?
+    /// Bumped per attached session; anything that arrives from an earlier one is dropped.
+    @ObservationIgnored private var generation = 0
+
+    // MARK: What the window asks
+
+    /// Whether there is an editable session to stage edits in.
+    var isEditable: Bool { session != nil }
+    var hasChanges: Bool { !changes.isEmpty }
+    var canCommit: Bool { isEditable && hasChanges && !isCommitting }
+
+    // MARK: The session
+
+    /// Starts staging edits in `session`, which is editable, backing it up with `backup` before its first commit.
+    func attach(_ session: StoreSession, backup: PreCommitBackup) {
+        detach()
+        self.session = session
+        self.backup = backup
+    }
+
+    /// The session is closing, or has been reopened read-only: whatever it staged goes with it.
+    func detach() {
+        generation += 1
+        session = nil
+        backup = nil
+        isCommitting = false
+        undoManager.removeAllActions(withTarget: self)
+        guard changes != .none else { return }
+        changes = .none
+        revision += 1
+    }
+
+    // MARK: Staging
+
+    /// Stages a new value for an attribute or a to-one relationship of `object`.
+    func setValue(_ value: Value, for property: String, of object: PendingObjectID) {
+        let name = String(localized: "Edit \(property)")
+        stage { try await $0.setValue(value, for: property, of: object, actionName: name) }
+    }
+
+    /// Stages the deletion of `objects`, and whatever their delete rules take along.
+    func delete(_ objects: [PendingObjectID]) {
+        guard !objects.isEmpty else { return }
+        let name =
+            objects.count == 1
+            ? String(localized: "Delete \(objects[0].entity)") : String(localized: "Delete \(objects.count) Objects")
+        stage { try await $0.delete(objects, actionName: name) }
+    }
+
+    /// Stages a new object of `entity`.
+    func insertObject(of entity: String) {
+        let name = String(localized: "New \(entity)")
+        stage { try await $0.insertObject(entity: entity, actionName: name).changes }
+    }
+
+    /// Throws away everything staged. The file is not touched.
+    func discard() {
+        undoManager.removeAllActions(withTarget: self)
+        send { try await $0.discardChanges() }
+    }
+
+    /// Writes everything staged to the store, once the session's backup is taken and verified (EDT-9).
+    ///
+    /// - Returns: a task that finishes with whether the commit went through; a caller that has something to do
+    ///   afterwards — close, reload, lock — waits for it.
+    @discardableResult
+    func commit() -> Task<Bool, Never> {
+        guard let session, let backup, !isCommitting else { return Task { false } }
+        isCommitting = true
+        let generation = generation
+        let previous = control
+        let task = Task { [weak self] () -> Bool in
+            await previous?.value
+            do {
+                let summary = try await session.commit(after: backup)
+                guard let self, self.generation == generation else { return false }
+                self.isCommitting = false
+                self.lastCommit = summary
+                self.undoManager.removeAllActions(withTarget: self)
+                self.changes = .none
+                if summary.total > 0 { self.commits += 1 }
+                self.revision += 1
+                self.onCommitFinished?()
+                return true
+            } catch {
+                guard let self, self.generation == generation else { return false }
+                self.isCommitting = false
+                self.onCommitFinished?()
+                self.fail(error)
+                return false
+            }
+        }
+        control = Task { _ = await task.value }
+        return task
+    }
+
+    /// Returns once everything sent to the session has been done. Nothing in the app waits for that; the tests
+    /// do.
+    func whenSettled() async {
+        await control?.value
+    }
+
+    // MARK: Undo
+
+    /// An edit the session added to its stack: one entry in the window's.
+    ///
+    /// The session's answer arrives in a task, not in the event that asked for it, so the entry is made a group
+    /// of its own rather than left to the event grouping: two answers in one pass of the run loop would otherwise
+    /// share the event's group and undo as one.
+    private func registerUndo(named name: String) {
+        let byEvent = undoManager.groupsByEvent && undoManager.groupingLevel == 0
+        if byEvent { undoManager.groupsByEvent = false }
+        defer { if byEvent { undoManager.groupsByEvent = true } }
+        undoManager.beginUndoGrouping()
+        undoManager.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated { target.stepBack(named: name) }
+        }
+        undoManager.setActionName(name)
+        undoManager.endUndoGrouping()
+    }
+
+    /// Called by the undo manager while it undoes: what is registered here is the redo.
+    private func stepBack(named name: String) {
+        undoManager.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated { target.stepForward(named: name) }
+        }
+        undoManager.setActionName(name)
+        send { try await $0.undo() }
+    }
+
+    private func stepForward(named name: String) {
+        undoManager.registerUndo(withTarget: self) { target in
+            MainActor.assumeIsolated { target.stepBack(named: name) }
+        }
+        undoManager.setActionName(name)
+        send { try await $0.redo() }
+    }
+
+    // MARK: Talking to the session
+
+    /// Sends an edit, and mirrors it in the window's undo stack if the session added one to its own.
+    private func stage(_ operation: @escaping @MainActor (StoreSession) async throws -> PendingChanges) {
+        send(operation) { [weak self] before, after in
+            guard let self, after.undoDepth > before.undoDepth else { return }
+            self.registerUndo(named: after.undoActionName)
+        }
+    }
+
+    private func send(
+        _ operation: @escaping @MainActor (StoreSession) async throws -> PendingChanges,
+        then: (@MainActor (_ before: PendingChanges, _ after: PendingChanges) -> Void)? = nil
+    ) {
+        guard let session else { return }
+        let generation = generation
+        let previous = control
+        control = Task { [weak self] in
+            await previous?.value
+            do {
+                let after = try await operation(session)
+                guard let self, self.generation == generation else { return }
+                let before = self.changes
+                self.show(after)
+                then?(before, after)
+            } catch {
+                guard let self, self.generation == generation else { return }
+                self.fail(error)
+            }
+        }
+    }
+
+    private func show(_ changes: PendingChanges) {
+        self.changes = changes
+        revision += 1
+        // The window's stack mirrors the session's; when the session has nothing to undo or redo, neither does
+        // the window — whatever it still holds would undo nothing.
+        if changes.undoDepth == 0, !changes.canRedo { undoManager.removeAllActions(withTarget: self) }
+    }
+
+    private func fail(_ error: any Error) {
+        let error = DabbiError.wrapping(error)
+        lastError = error
+        onError?(error)
+    }
+}

@@ -10,6 +10,8 @@ class PersistentSplitViewController: NSSplitViewController {
     let layoutIdentifier: String
     /// Pane identifiers by item, for `WindowState.collapsedPanes`. An item without one is never collapsed.
     private var paneIdentifiers: [ObjectIdentifier: String] = [:]
+    /// Panes that start shut until the user opens them.
+    private var collapsedByDefault: Set<String> = []
     private var hasRestored = false
 
     init(context: ProjectContext, layoutIdentifier: String) {
@@ -21,10 +23,13 @@ class PersistentSplitViewController: NSSplitViewController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not in a nib") }
 
-    func addPane(_ item: NSSplitViewItem, identifier: String? = nil) {
+    /// - Parameter collapsed: whether the pane starts shut in a layout that has never been saved with it — a
+    ///   pane that is only sometimes worth its room, such as Pending Changes.
+    func addPane(_ item: NSSplitViewItem, identifier: String? = nil, collapsed: Bool = false) {
         if let identifier {
             paneIdentifiers[ObjectIdentifier(item)] = identifier
             item.canCollapse = true
+            if collapsed { collapsedByDefault.insert(identifier) }
         }
         addSplitViewItem(item)
     }
@@ -66,14 +71,16 @@ class PersistentSplitViewController: NSSplitViewController {
     private func restore() {
         let state = context.local.window
         // Positions first, while every pane is there to take one.
-        if let positions = state.dividers[layoutIdentifier], positions.count == splitViewItems.count - 1 {
-            for (index, position) in positions.enumerated() {
-                splitView.setPosition(position, ofDividerAt: index)
-            }
+        let saved = state.dividers[layoutIdentifier].flatMap { $0.count == splitViewItems.count - 1 ? $0 : nil }
+        for (index, position) in (saved ?? []).enumerated() {
+            splitView.setPosition(position, ofDividerAt: index)
         }
         for item in splitViewItems {
             guard let identifier = paneIdentifiers[ObjectIdentifier(item)] else { continue }
-            item.isCollapsed = state.collapsedPanes.contains(identifier)
+            // A layout saved before the pane existed — or never saved — says nothing about it.
+            let isNew = saved == nil && !state.collapsedPanes.contains(identifier)
+            item.isCollapsed =
+                state.collapsedPanes.contains(identifier) || (isNew && collapsedByDefault.contains(identifier))
         }
     }
 

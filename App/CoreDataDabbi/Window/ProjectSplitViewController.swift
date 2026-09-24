@@ -8,6 +8,8 @@ enum Pane {
     static let inspector = "inspector"
     static let relationships = "relationships"
     static let content = "content"
+    /// Staged edits, waiting to be committed (EDT-8). Shut until there are some.
+    static let changes = "changes"
     /// The grid. Not a collapsible pane — there would be nothing left — but a place the keyboard is sent to.
     static let rows = "rows"
     /// The predicate bar above the grid. It has a shortcut of its own (⌥⌘F, §8.3) rather than a place in the
@@ -24,6 +26,7 @@ enum Pane {
         case filter: String(localized: "Filter")
         case relationships: String(localized: "Relationships")
         case content: String(localized: "Content")
+        case changes: String(localized: "Pending Changes")
         case inspector: String(localized: "Inspector")
         default: pane
         }
@@ -68,10 +71,14 @@ final class ProjectSplitViewController: PersistentSplitViewController {
             return centre.browse.rowsPane
         case Pane.filter:
             return centre.browse.bar
-        case Pane.relationships, Pane.content:
+        case Pane.relationships, Pane.content, Pane.changes:
             centre.show(Pane.bottom)
             centre.bottom.show(pane)
-            return pane == Pane.relationships ? centre.bottom.relationships : centre.bottom.content
+            switch pane {
+            case Pane.relationships: return centre.bottom.relationships
+            case Pane.content: return centre.bottom.content
+            default: return centre.bottom.changes
+            }
         case Pane.inspector:
             show(Pane.inspector)
             return inspector
@@ -104,14 +111,16 @@ final class CentreSplitViewController: PersistentSplitViewController {
     }
 }
 
-/// Relationships │ content.
+/// Relationships │ content │ pending changes.
 final class BottomSplitViewController: PersistentSplitViewController {
     let relationships: RelationshipsViewController
     let content: ContentViewController
+    let changes: PendingChangesViewController
 
     init(context: ProjectContext) {
         relationships = RelationshipsViewController(context: context)
         content = ContentViewController(context: context)
+        changes = PendingChangesViewController(context: context)
         super.init(context: context, layoutIdentifier: "bottom")
         splitView.isVertical = true
 
@@ -122,5 +131,9 @@ final class BottomSplitViewController: PersistentSplitViewController {
         let right = NSSplitViewItem(viewController: content)
         right.minimumThickness = 200
         addPane(right, identifier: Pane.content)
+
+        let staged = NSSplitViewItem(viewController: changes)
+        staged.minimumThickness = 240
+        addPane(staged, identifier: Pane.changes, collapsed: true)
     }
 }

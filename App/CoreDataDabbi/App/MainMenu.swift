@@ -75,6 +75,11 @@ enum MainMenu {
                 [.command, .shift]))
         menu.addItem(
             item(String(localized: "Show Store in Finder"), #selector(ProjectWindowController.revealStore(_:))))
+        menu.addItem(.separator())
+        menu.addItem(
+            item(
+                String(localized: "Project Settings…"), #selector(ProjectWindowController.showProjectSettings(_:)), ",",
+                [.command, .option]))
         return menu
     }
 
@@ -160,6 +165,29 @@ enum MainMenu {
     /// What the store is doing while the window is open (TRK-1, TRK-9).
     private static func data() -> NSMenu {
         let menu = NSMenu(title: String(localized: "Data"))
+        // The lock (EDT-1), titled by what it does next: Allow Editing, or Lock Store.
+        menu.addItem(
+            item(
+                String(localized: "Allow Editing"), #selector(ProjectWindowController.toggleAccessMode(_:)), "e",
+                [.command, .option]))
+        // Staged edits (EDT-8): nothing is written until Commit, and Commit backs the store up first (EDT-9).
+        menu.addItem(
+            item(
+                String(localized: "Commit to Store"), #selector(ProjectWindowController.commitChanges(_:)), "\r"))
+        menu.addItem(
+            item(String(localized: "Discard Changes…"), #selector(ProjectWindowController.discardChanges(_:))))
+        menu.addItem(
+            item(
+                String(localized: "Delete Rows"), #selector(ProjectWindowController.deleteObjects(_:)),
+                String(UnicodeScalar(NSBackspaceCharacter)!)))
+        menu.addItem(
+            item(
+                String(localized: "Show Pending Changes"), #selector(ProjectWindowController.togglePendingChanges(_:)),
+                "p", [.command, .option]))
+        menu.addItem(.separator())
+        // A copy of the store to come back to (§7.3); restoring one is in the sidebar's Snapshots section.
+        menu.addItem(item(String(localized: "Take Snapshot…"), #selector(ProjectWindowController.takeSnapshot(_:))))
+        menu.addItem(.separator())
         // Play and Stop as one item whose title says which it is. Shift-Command-R is Reload Store, so tracking
         // takes the plain one.
         menu.addItem(

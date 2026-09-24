@@ -18,9 +18,6 @@ public struct WorkingCopy: Sendable, Hashable, Codable {
     public let folder: URL
     public let createdAt: Date
 
-    /// Suffixes of the files that make up a database.
-    static let sideFiles = ["-wal", "-shm"]
-
     /// Copies `store` into a new folder under `directory`.
     ///
     /// On APFS the copy is a clone: instant, and it takes no space until one of the two changes.
@@ -31,13 +28,12 @@ public struct WorkingCopy: Sendable, Hashable, Codable {
         do {
             try files.createDirectory(at: folder, withIntermediateDirectories: true)
             try files.copyItem(at: store, to: copy)
-            for suffix in sideFiles where files.fileExists(atPath: store.path + suffix) {
+            for suffix in StoreFiles.sideFileSuffixes where files.fileExists(atPath: store.path + suffix) {
                 try files.copyItem(atPath: store.path + suffix, toPath: copy.path + suffix)
             }
-            // Attributes with "Allows External Storage" keep their large values here, by file name.
-            let support = Self.externalDataFolder(of: store)
+            let support = StoreFiles.supportFolder(of: store)
             if files.fileExists(atPath: support.path) {
-                try files.copyItem(at: support, to: Self.externalDataFolder(of: copy))
+                try files.copyItem(at: support, to: StoreFiles.supportFolder(of: copy))
             }
             try SQLiteConnection.consolidate(ownedCopyAt: copy)
         } catch {
@@ -49,12 +45,6 @@ public struct WorkingCopy: Sendable, Hashable, Codable {
                 recovery: ["Check the free space on the disk, and the permissions of the store."], underlying: error)
         }
         return WorkingCopy(original: store, url: copy, folder: folder, createdAt: Date())
-    }
-
-    /// `.Model_SUPPORT` beside `Model.sqlite`.
-    static func externalDataFolder(of store: URL) -> URL {
-        let name = store.deletingPathExtension().lastPathComponent
-        return store.deletingLastPathComponent().appendingPathComponent(".\(name)_SUPPORT", isDirectory: true)
     }
 
     public func remove() {

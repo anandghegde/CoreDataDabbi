@@ -52,15 +52,35 @@ public struct SimulatorDeviceSource: Sendable {
         }
     }
 
+    /// Quits an app running on a simulator, the way the Home screen's app switcher would: so that a snapshot can
+    /// be put back in place of its store (§7.3). An app that is not running is not an error.
+    public func terminate(_ bundleID: String, on udid: String) async throws {
+        guard let runner else {
+            throw DabbiError(.toolUnavailable, "simctl is not used here.", arguments: ["bundleID": bundleID])
+        }
+        let result = try await runner.run(
+            ProcessRunner.xcrun, arguments: simctl + ["terminate", udid, bundleID], timeout: timeout)
+        guard !result.succeeded, !result.errorSummary.contains("found nothing to terminate") else { return }
+        throw DabbiError(
+            .toolFailed, "simctl could not quit the app.",
+            arguments: ["bundleID": bundleID, "udid": udid, "status": String(result.status)],
+            diagnosis: [result.errorSummary].filter { !$0.isEmpty },
+            recovery: ["Quit the app in the simulator, then try again."])
+    }
+
     // MARK: simctl
 
-    func devicesFromSimctl(_ runner: any ProcessRunning) async throws -> [SimulatorDevice] {
-        var arguments = ["simctl"]
+    /// `simctl`, and the device set when it is not the default one.
+    private var simctl: [String] {
         // The default set needs no naming, and naming it would make simctl treat it as a custom one.
-        if devicesDirectory.standardizedFileURL != Self.defaultDevicesDirectory.standardizedFileURL {
-            arguments += ["--set", devicesDirectory.path]
+        guard devicesDirectory.standardizedFileURL != Self.defaultDevicesDirectory.standardizedFileURL else {
+            return ["simctl"]
         }
-        arguments += ["list", "-j", "devices"]
+        return ["simctl", "--set", devicesDirectory.path]
+    }
+
+    func devicesFromSimctl(_ runner: any ProcessRunning) async throws -> [SimulatorDevice] {
+        let arguments = simctl + ["list", "-j", "devices"]
         let result = try await runner.run(ProcessRunner.xcrun, arguments: arguments, timeout: timeout)
         guard result.succeeded else {
             throw DabbiError(

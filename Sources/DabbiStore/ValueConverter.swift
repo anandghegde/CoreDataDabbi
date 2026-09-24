@@ -6,7 +6,7 @@ import Foundation
 /// Converts managed objects to `Value`s. Only ever called inside `context.perform`; what comes out is `Sendable`
 /// and is the only thing that leaves the closure (ADR-02).
 struct ValueConverter: Sendable {
-    private struct Layout: Sendable {
+    struct Layout: Sendable {
         var attributes: [String: AttributeDescription] = [:]
         var relationships: [String: RelationshipDescription] = [:]
         /// The attribute a to-one pointing at this entity is labelled with.
@@ -14,7 +14,7 @@ struct ValueConverter: Sendable {
     }
 
     let model: ModelDescription
-    private let layouts: [String: Layout]
+    let layouts: [String: Layout]
 
     init(model: ModelDescription) {
         self.model = model
@@ -121,7 +121,7 @@ struct ValueConverter: Sendable {
         return RelatedObjects.Item(ref: ref, display: display.flatMap { $0.isEmpty ? nil : $0 })
     }
 
-    private func toOne(_ raw: Any?) -> Value {
+    func toOne(_ raw: Any?) -> Value {
         guard let destination = raw as? NSManagedObject,
             let ref = ObjectRef(uri: destination.objectID.uriRepresentation())
         else { return .toOne(nil, display: nil) }
@@ -130,7 +130,7 @@ struct ValueConverter: Sendable {
         return .toOne(ref, display: display.flatMap { $0.isEmpty ? nil : $0 })
     }
 
-    private func toMany(_ raw: Any?) -> Value {
+    func toMany(_ raw: Any?) -> Value {
         switch raw {
         case let set as NSSet: .toMany(count: set.count)
         case let set as NSOrderedSet: .toMany(count: set.count)

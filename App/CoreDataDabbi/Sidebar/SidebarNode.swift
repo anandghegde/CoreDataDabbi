@@ -15,6 +15,8 @@ final class SidebarNode {
         case fetchRequest(FetchTemplatePlan)
         /// A predicate kept in the project, and what the model says of it now (PRD-3, PRD-5).
         case savedPredicate(SavedPredicate, SavedPredicateCheck)
+        /// A copy of the store — the user's, or a backup the app took — to put back (§7.3).
+        case snapshot(SnapshotManifest)
     }
 
     let kind: Kind
@@ -42,6 +44,11 @@ final class SidebarNode {
         if case .fetchRequest(let plan) = kind { plan } else { nil }
     }
 
+    /// The snapshot this row stands for, if it stands for one.
+    var snapshot: SnapshotManifest? {
+        if case .snapshot(let manifest) = kind { manifest } else { nil }
+    }
+
     /// Whether clicking the row shows something: an entity, a template whose entity is there, or a saved
     /// predicate whose entity is still there. One that no longer fits the model otherwise still opens — the
     /// predicate bar says what is wrong with it.
@@ -50,7 +57,8 @@ final class SidebarNode {
         case .entity: true
         case .fetchRequest(let plan): plan.isRunnable
         case .savedPredicate(_, let check): !check.isMissingEntity
-        case .group: false
+        // Nothing to show in the grid; what can be done with one is in its menu.
+        case .snapshot, .group: false
         }
     }
 
@@ -64,6 +72,7 @@ final class SidebarNode {
         case .entity(let entity): entity.name
         case .fetchRequest(let plan): plan.name
         case .savedPredicate(let predicate, _): predicate.name
+        case .snapshot(let manifest): manifest.name
         }
     }
 
@@ -80,13 +89,14 @@ final class SidebarNode {
 
     // MARK: Building
 
-    /// The whole sidebar of a model: entities nested by inheritance, the model's fetch requests, then the
-    /// project's saved predicates, in the order they are given (§8.2).
+    /// The whole sidebar of a model: entities nested by inheritance, the model's fetch requests, the project's
+    /// saved predicates, then the store's snapshots, each in the order they are given (§8.2).
     ///
     /// Entities are sorted by name within each level, the way a person looks for one — not in the order the
     /// model happens to list them.
     static func tree(
-        of model: ModelDescription, savedPredicates: [(SavedPredicate, SavedPredicateCheck)] = []
+        of model: ModelDescription, savedPredicates: [(SavedPredicate, SavedPredicateCheck)] = [],
+        snapshots: [SnapshotManifest] = []
     ) -> [SidebarNode] {
         var groups: [SidebarNode] = []
         let entities = model.rootEntities.map { subtree(of: $0, in: model) }
@@ -106,6 +116,11 @@ final class SidebarNode {
                 SidebarNode(
                     .group(String(localized: "Saved Predicates")),
                     children: savedPredicates.map { SidebarNode(.savedPredicate($0, $1)) }))
+        }
+        if !snapshots.isEmpty {
+            groups.append(
+                SidebarNode(
+                    .group(String(localized: "Snapshots")), children: snapshots.map { SidebarNode(.snapshot($0)) }))
         }
         return groups
     }

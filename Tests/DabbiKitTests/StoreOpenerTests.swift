@@ -52,6 +52,30 @@ import Testing
         await opened.close()
     }
 
+    /// EDT-1: edits to a working copy would be thrown away with it, so an editable store is opened where it
+    /// is or not at all — and the opener says why rather than quietly handing over something read-only.
+    @Test func neverEditsAWorkingCopy() async throws {
+        let original = try TestFixtures.scratchCopy(.walOnly)
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: original.directory.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: original.directory.path)
+        }
+        let opener = opener()
+        let error = await #expect(throws: DabbiError.self) {
+            try await opener.open(storeURL: original.storeURL, access: .editable(.app))
+        }
+        #expect(error?.code == .storeNotWritable)
+        #expect(!FileManager.default.fileExists(atPath: opener.workingCopiesDirectory.path))
+    }
+
+    @Test func opensAnEditableStoreInPlace() async throws {
+        let original = try TestFixtures.scratchCopy(.walOnly)
+        let opened = try await opener().open(storeURL: original.storeURL, access: .editable(.app))
+        #expect(!opened.isWorkingCopy)
+        #expect(opened.session.info.accessMode == .editable)
+        await opened.close()
+    }
+
     /// A simulator store without a cached model: the app it belongs to has the model in its bundle.
     @Test func findsTheModelInTheAppNextToASimulatorStore() async throws {
         let set = try SyntheticDeviceSet()

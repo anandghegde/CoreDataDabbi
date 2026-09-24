@@ -95,6 +95,12 @@ public final class PagedRows {
         return before..<extended.count
     }
 
+    /// Reads the rows in memory again, from the same pager: an edit was staged, undone or discarded, and the
+    /// values held were read before it. The list itself is the pager's and stays as it is.
+    public func reload() {
+        invalidateRows()
+    }
+
     /// Moves the window to another pager — after a new fetch, or a new generation. Nothing is kept.
     public func replace(handle: PagerHandle) {
         let old = self.handle

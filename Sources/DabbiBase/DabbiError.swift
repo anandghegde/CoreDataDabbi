@@ -74,6 +74,9 @@ extension DabbiError.Code {
     // Store session
     public static let storeOpenFailed: Self = "store.openFailed"
     public static let storeClosed: Self = "store.closed"
+    /// Editable was asked for, and the store cannot be written where it is: the file, its folder or its
+    /// write-ahead log is not writable (EDT-1).
+    public static let storeNotWritable: Self = "store.notWritable"
     public static let unknownEntity: Self = "store.unknownEntity"
     public static let unknownProperty: Self = "store.unknownProperty"
     public static let invalidPredicate: Self = "store.invalidPredicate"
@@ -87,15 +90,43 @@ extension DabbiError.Code {
     /// Persistent history was asked for on a store that does not record any.
     public static let historyUnavailable: Self = "store.historyUnavailable"
 
+    // Staged edits and commits
+    /// An edit was asked of a session opened read-only.
+    public static let notEditable: Self = "edit.notEditable"
+    /// A value the property cannot hold: the wrong type, out of the type's range, or not settable here.
+    public static let invalidValue: Self = "edit.invalidValue"
+    /// The commit was refused by the model's validation; nothing was written.
+    public static let validationFailed: Self = "edit.validationFailed"
+    /// Somebody else changed or deleted the same rows since they were read, or a uniqueness constraint
+    /// clashed; nothing was written (EDT-10).
+    public static let commitConflict: Self = "edit.commitConflict"
+    /// The commit failed for another reason; nothing was written.
+    public static let commitFailed: Self = "edit.commitFailed"
+    /// Something the commit has to do first — the pre-commit backup — failed; nothing was written.
+    public static let commitPreparationFailed: Self = "edit.commitPreparationFailed"
+
     // Projects
     public static let projectUnreadable: Self = "project.unreadable"
     /// The project was written by a newer version of the app, with a schema this one does not know.
     public static let projectTooNew: Self = "project.tooNew"
     public static let projectWriteFailed: Self = "project.writeFailed"
 
+    // Snapshots
+    /// A snapshot or backup could not be taken; nothing was left behind.
+    public static let snapshotFailed: Self = "snapshot.failed"
+    /// A copy was made and does not hold up: it is damaged, or it is not the store it was made from (EDT-9).
+    public static let snapshotUnverified: Self = "snapshot.unverified"
+    public static let snapshotNotFound: Self = "snapshot.notFound"
+    /// Another process has the store open — the app it belongs to is running — so it cannot be replaced.
+    public static let storeInUse: Self = "snapshot.storeInUse"
+    /// A snapshot could not be put back. Whether the store was left as it was is in the message.
+    public static let restoreFailed: Self = "snapshot.restoreFailed"
+
     // Locating stores
     /// A developer tool (`xcrun`, `simctl`) is not installed or could not be started.
     public static let toolUnavailable: Self = "locator.toolUnavailable"
+    /// A tool ran and said it could not do what it was asked.
+    public static let toolFailed: Self = "locator.toolFailed"
     /// A tool ran and answered with something that cannot be read.
     public static let toolOutputUnreadable: Self = "locator.toolOutputUnreadable"
     /// A store location no longer leads to a file: the device, the app or the file is gone (PRJ-12).

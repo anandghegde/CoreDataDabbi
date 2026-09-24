@@ -25,6 +25,16 @@
         }
       }
     },
+    "%@ on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ on %2$@"
+          }
+        }
+      }
+    },
     "%@ points at nothing else." : {
 
     },
@@ -95,11 +105,31 @@
         }
       }
     },
+    "%@, from %@ to %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, from %2$@ to %3$@"
+          }
+        }
+      }
+    },
     "%@, not where it was" : {
 
     },
     "%@, unchanged" : {
 
+    },
+    "%@, was %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, was %2$@"
+          }
+        }
+      }
     },
     "%@.%@ · %@" : {
       "localizations" : {
@@ -144,14 +174,23 @@
         }
       }
     },
+    "%lld deleted" : {
+
+    },
     "%lld items" : {
 
     },
     "%lld moved" : {
 
     },
+    "%lld new" : {
+
+    },
     "%lld objects" : {
       "comment" : "Number of objects in a relationship"
+    },
+    "%lld objects have changes that are not in the store yet. Discarded changes cannot be recovered." : {
+
     },
     "%lld of its own, %lld with its subentities" : {
       "comment" : "Tooltip on the row count of an entity that has subentities",
@@ -176,6 +215,9 @@
     "%lld stores" : {
 
     },
+    "%lld updated" : {
+
+    },
     "%lld versions" : {
 
     },
@@ -197,6 +239,12 @@
     "A container was too large to search to the end; some stores may be missing." : {
 
     },
+    "A snapshot cannot be restored while another app has the store open. Quit it, then restore?" : {
+
+    },
+    "A snapshot cannot be restored while another process has the store open. Quit it, then try again." : {
+
+    },
     "About %@" : {
 
     },
@@ -204,6 +252,9 @@
 
     },
     "Abstract — its rows are its subentities'" : {
+
+    },
+    "Allow Editing" : {
 
     },
     "An empty string, not nil" : {
@@ -226,6 +277,15 @@
     },
     "Back/Forward" : {
 
+    },
+    "Backup taken %@" : {
+      "comment" : "Snapshot tooltip; the argument is a date"
+    },
+    "Before editing" : {
+
+    },
+    "Before restoring “%@”" : {
+      "comment" : "Name of the backup taken before a snapshot is restored; the argument is the snapshot's name"
     },
     "Binary property list" : {
 
@@ -272,10 +332,16 @@
     "Choose" : {
 
     },
+    "Choose Model…" : {
+
+    },
     "Choose Store…" : {
 
     },
     "Choose a Core Data or SwiftData store." : {
+
+    },
+    "Choose a model — a .mom, a .momd, or the app it is in." : {
 
     },
     "Choose a relationship" : {
@@ -309,6 +375,15 @@
 
     },
     "Columns (%lld)" : {
+
+    },
+    "Commit" : {
+
+    },
+    "Commit the pending changes first?" : {
+
+    },
+    "Commit to Store" : {
 
     },
     "Comparison" : {
@@ -377,7 +452,19 @@
     "Delete" : {
       "comment" : "Saved predicate context menu"
     },
+    "Delete %@" : {
+
+    },
+    "Delete %lld Objects" : {
+
+    },
+    "Delete Rows" : {
+
+    },
     "Delete rule" : {
+
+    },
+    "Delete “%@”?" : {
 
     },
     "Deleted" : {
@@ -385,6 +472,9 @@
     },
     "Deleted while it was being read" : {
 
+    },
+    "Delete…" : {
+      "comment" : "Snapshot context menu"
     },
     "Deny" : {
 
@@ -407,8 +497,23 @@
     "Device, app or store" : {
 
     },
+    "Discard" : {
+
+    },
+    "Discard Changes…" : {
+
+    },
+    "Discard all pending changes?" : {
+
+    },
+    "Display" : {
+
+    },
     "Does not fit the model" : {
       "comment" : "Saved predicate warning badge"
+    },
+    "Done" : {
+
     },
     "Drop a store, an app bundle or an .xcappdata container here." : {
 
@@ -419,10 +524,25 @@
     "Edit" : {
 
     },
+    "Edit %@" : {
+
+    },
+    "Edit Note" : {
+
+    },
+    "Edit Note…" : {
+      "comment" : "Snapshot context menu"
+    },
     "Editable" : {
 
     },
+    "Edits are staged here until they are committed to the store." : {
+
+    },
     "Elements" : {
+
+    },
+    "Elsewhere in the app’s container: %@" : {
 
     },
     "Empty text, not nil" : {
@@ -506,10 +626,16 @@
     "Hide Others" : {
 
     },
+    "Hide Pending Changes" : {
+
+    },
     "Hide Predicate Builder" : {
 
     },
     "Hide earlier versions" : {
+
+    },
+    "In the folder the store used to be in." : {
 
     },
     "Indexes" : {
@@ -563,6 +689,12 @@
     "Load More" : {
 
     },
+    "Location" : {
+
+    },
+    "Lock Store" : {
+
+    },
     "Log what the app writes to this store" : {
 
     },
@@ -605,10 +737,22 @@
     "Missing %@" : {
       "comment" : "Saved predicate warning badge; the key paths the model no longer has"
     },
+    "Model" : {
+
+    },
     "Model file" : {
 
     },
     "Move To…" : {
+
+    },
+    "Name:" : {
+
+    },
+    "New" : {
+
+    },
+    "New %@" : {
 
     },
     "New Predicate" : {
@@ -644,6 +788,9 @@
     "No objects" : {
 
     },
+    "No pending changes" : {
+
+    },
     "No relationships" : {
 
     },
@@ -651,6 +798,9 @@
 
     },
     "No simulators" : {
+
+    },
+    "No store" : {
 
     },
     "No stores" : {
@@ -683,6 +833,9 @@
     "Not where it was" : {
 
     },
+    "Note:" : {
+
+    },
     "Nothing on the other side" : {
 
     },
@@ -690,6 +843,9 @@
 
     },
     "Nullify" : {
+
+    },
+    "OK" : {
 
     },
     "Object ID" : {
@@ -720,6 +876,9 @@
 
     },
     "Open this store in a new project" : {
+
+    },
+    "Open, as a copy" : {
 
     },
     "Opening %@…" : {
@@ -755,10 +914,19 @@
     "Paused" : {
 
     },
+    "Pending Changes" : {
+
+    },
     "Pick an app's store from a simulator" : {
 
     },
     "Predicate builder" : {
+
+    },
+    "Project Settings" : {
+
+    },
+    "Project Settings…" : {
 
     },
     "Quantifier" : {
@@ -767,7 +935,13 @@
     "Quit %@" : {
 
     },
+    "Quit and Restore" : {
+
+    },
     "Range" : {
+
+    },
+    "Read With" : {
 
     },
     "Read from the simulator folders; simctl could not be asked." : {
@@ -813,7 +987,7 @@
 
     },
     "Rename" : {
-      "comment" : "Saved predicate context menu"
+      "comment" : "Sidebar context menu, on a saved predicate or a snapshot"
     },
     "Rename…" : {
 
@@ -823,6 +997,15 @@
     },
     "Rendered" : {
 
+    },
+    "Restore" : {
+
+    },
+    "Restore “%@”?" : {
+
+    },
+    "Restore…" : {
+      "comment" : "Snapshot context menu"
     },
     "Resume Tracking" : {
 
@@ -861,6 +1044,9 @@
 
     },
     "SQLite" : {
+
+    },
+    "Save" : {
 
     },
     "Save Predicate" : {
@@ -917,6 +1103,9 @@
     "Show Other Databases" : {
 
     },
+    "Show Pending Changes" : {
+
+    },
     "Show Predicate Builder" : {
 
     },
@@ -936,7 +1125,7 @@
 
     },
     "Show in Finder" : {
-
+      "comment" : "Snapshot context menu"
     },
     "Show only simulators that are running" : {
 
@@ -965,8 +1154,20 @@
     "Size All Columns to Fit" : {
 
     },
+    "Snapshot %@" : {
+      "comment" : "Default name of a snapshot; the argument is when it was taken"
+    },
+    "Snapshot taken %@" : {
+      "comment" : "Snapshot tooltip; the argument is a date"
+    },
+    "Snapshots" : {
+
+    },
     "Some changes cannot be tracked exactly" : {
       "comment" : "Footer warning for reduced-fidelity tracking"
+    },
+    "Status" : {
+
     },
     "Stop Tracking" : {
 
@@ -992,7 +1193,22 @@
     "Subentities" : {
 
     },
+    "Suggested Fix" : {
+
+    },
+    "Suggested Fixes" : {
+
+    },
     "SwiftData" : {
+
+    },
+    "Take Snapshot" : {
+
+    },
+    "Take Snapshot…" : {
+
+    },
+    "Take a Snapshot" : {
 
     },
     "Text" : {
@@ -1005,6 +1221,12 @@
 
     },
     "The builder could not show this predicate. It is kept as text." : {
+
+    },
+    "The copy is of the store as it is on disk. Pending changes are not in it." : {
+
+    },
+    "The copy of the store is thrown away. This cannot be undone." : {
 
     },
     "The field could not be read." : {
@@ -1025,6 +1247,9 @@
     "The image this field holds" : {
 
     },
+    "The model cached in the store" : {
+
+    },
     "The relationship could not be read." : {
 
     },
@@ -1037,8 +1262,29 @@
     "The rows could not be read." : {
 
     },
+    "The same app, at the same path, on another simulator." : {
+
+    },
     "The store file was replaced — reopening" : {
       "comment" : "Shown when the watched app reinstalled or restored its store"
+    },
+    "The store is editable. Click to make it read-only." : {
+
+    },
+    "The store is open in %@" : {
+
+    },
+    "The store is read-only. Allow editing to stage changes." : {
+
+    },
+    "The store is read-only. Click to allow editing." : {
+
+    },
+    "The store is replaced by the snapshot taken %@. A backup of the store as it is now is taken first, and listed with the snapshots." : {
+
+    },
+    "The store stays as it is. This cannot be undone." : {
+
     },
     "The table could not be read." : {
 
@@ -1052,6 +1298,9 @@
     "This Mac" : {
 
     },
+    "This Mac’s (%@)" : {
+
+    },
     "This object's “%@” is empty." : {
 
     },
@@ -1062,6 +1311,12 @@
 
     },
     "This row has no such property." : {
+
+    },
+    "This store cannot be edited" : {
+
+    },
+    "Time Zone" : {
 
     },
     "To" : {
@@ -1103,6 +1358,9 @@
     "UNIQUE" : {
 
     },
+    "UTC" : {
+
+    },
     "UUID" : {
       "comment" : "Placeholder of a UUID field"
     },
@@ -1116,6 +1374,15 @@
 
     },
     "Updated" : {
+
+    },
+    "Use %@" : {
+
+    },
+    "Use Cached Model" : {
+
+    },
+    "Use This Store" : {
 
     },
     "User info" : {
@@ -1170,6 +1437,9 @@
     "Working Copy" : {
 
     },
+    "Written %@." : {
+
+    },
     "XML property list" : {
 
     },
@@ -1214,6 +1484,9 @@
     },
     "and" : {
       "comment" : "Predicate builder: between one value and another"
+    },
+    "another simulator" : {
+
     },
     "array" : {
 
