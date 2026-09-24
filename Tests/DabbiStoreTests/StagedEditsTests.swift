@@ -232,6 +232,9 @@ import Testing
 
     @Test func objectsAreReadAsStagedInsertedOnesIncluded() async throws {
         let (session, location) = try await open(.basic)
+        // Found before the insert: a fetch with a limit counts an inserted object, which has no reference to
+        // return, against it.
+        let ref = try await firstRow(session, "Sample")
         let (object, _) = try await session.insertObject(entity: "Sample")
         try await session.setValue(.string("Fresh"), for: "name", of: object)
 
@@ -243,7 +246,6 @@ import Testing
         #expect(inserted.values.count == inserted.columns.properties.count)
 
         // A saved object reads as `object(_:)` reads it: as staged.
-        let ref = try await firstRow(session, "Sample")
         try await session.setValue(.string("Changed"), for: "name", of: PendingObjectID(ref))
         let saved = try await session.stagedObject(PendingObjectID(ref))
         let snapshot = try await session.object(ref)
