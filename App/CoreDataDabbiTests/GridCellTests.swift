@@ -46,6 +46,24 @@ import Testing
         #expect(cell.toolTip == "Person#7")
     }
 
+    @Test func marksAValueThatBreaksARuleWithMoreThanColour() throws {
+        let cell = GridCellView()
+        let rule = "Must be at least 1 character long."
+        cell.show(
+            GridValue.render(.string(""), timeZone: .gmt, locale: english), trailing: false, column: "Name",
+            issue: rule)
+        // A symbol beside the value, and the rule in words for the pointer and for VoiceOver (EDT-2, §8.4).
+        #expect(cell.showsIssue)
+        #expect(cell.accessibilityHelp() == rule)
+        #expect(cell.toolTip == "\(rule)\nAn empty string, not nil")
+
+        // The same cell, reused for a value that breaks nothing, is not marked.
+        cell.show(GridValue.render(.string("Ada"), timeZone: .gmt, locale: english), trailing: false, column: "Name")
+        #expect(!cell.showsIssue)
+        #expect(cell.accessibilityHelp() == nil)
+        #expect(cell.toolTip == nil)
+    }
+
     @Test func saysThatAPageHasNotArrivedRatherThanNothingAtAll() throws {
         let cell = GridCellView()
         cell.show(.notLoaded, trailing: false, column: "Name")

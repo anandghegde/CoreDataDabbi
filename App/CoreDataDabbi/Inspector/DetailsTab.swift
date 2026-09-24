@@ -35,12 +35,22 @@ struct DetailsTab: View {
     }
 
     private func object(_ ref: ObjectRef, _ snapshot: ObjectSnapshot) -> some View {
-        ScrollView {
+        let fields = properties(of: snapshot)
+        let issues = model.issues(for: ref)
+        // Issues about the object as a whole, or a property it has no field for, go under the header.
+        let shown = Set(fields.map(\.name))
+        let general = issues.filter { issue in issue.property.map { !shown.contains($0) } ?? true }
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header(ref)
+                ForEach(general, id: \.self) { issue in
+                    IssueLine(issue: issue)
+                        .padding(.leading, -10)
+                        .padding(.bottom, 4)
+                }
                 Divider().padding(.bottom, 6)
-                ForEach(properties(of: snapshot), id: \.name) { property in
-                    row(property)
+                ForEach(fields, id: \.name) { property in
+                    row(property, issue: issues.first { $0.property == property.name })
                 }
             }
             .padding(.vertical, 10)
@@ -91,8 +101,9 @@ struct DetailsTab: View {
         }
     }
 
+    /// One field, and under it the rule of the model its staged value breaks, when it breaks one (EDT-2).
     @ViewBuilder
-    private func row(_ property: Property) -> some View {
+    private func row(_ property: Property, issue: ValidationIssue?) -> some View {
         let rendered = GridValue.render(property.value, timeZone: model.timeZone)
         VStack(alignment: .leading, spacing: 1) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -111,12 +122,27 @@ struct DetailsTab: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
+            if let issue {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text(issue.message)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.caption)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .help(rendered.tooltip ?? "")
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(property.name): \(rendered.text)")
+        .accessibilityLabel(Self.spoken(property.name, rendered.text, issue: issue))
+    }
+
+    /// “name: sample-3”, and what is wrong with it when something is.
+    static func spoken(_ name: String, _ value: String, issue: ValidationIssue?) -> String {
+        let field = String(localized: "\(name): \(value)")
+        return issue.map { String(localized: "\(field), \($0.message)") } ?? field
     }
 
     private func colour(of emphasis: GridValue.Emphasis) -> Color {

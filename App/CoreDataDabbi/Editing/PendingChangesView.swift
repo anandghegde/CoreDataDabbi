@@ -67,6 +67,18 @@ struct PendingChangesView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            if !editing.changes.issues.isEmpty {
+                // Committing stays possible: the commit is what decides, and it says why when it refuses.
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .accessibilityHidden(true)
+                    Text(Self.problems(editing.changes.issues.count))
+                        .lineLimit(1)
+                }
+                .help(String(localized: "The commit would be refused until these are resolved."))
+                .accessibilityElement(children: .combine)
+            }
             Spacer(minLength: 8)
             if editing.isCommitting { ProgressView().controlSize(.small) }
             Button(String(localized: "Discard")) { context.editing.discard() }
@@ -87,6 +99,9 @@ struct PendingChangesView: View {
                 ForEach(change.fields, id: \.property) { field in
                     FieldDiff(field: field, timeZone: context.timeZone)
                 }
+                ForEach(context.editing.issues(for: change.object), id: \.self) { issue in
+                    IssueLine(issue: issue)
+                }
             }
             .padding(.vertical, 2)
             .contentShape(Rectangle())
@@ -106,6 +121,40 @@ struct PendingChangesView: View {
         if updated > 0 { parts.append(String(localized: "\(updated) updated")) }
         if deleted > 0 { parts.append(String(localized: "\(deleted) deleted")) }
         return parts.joined(separator: " · ")
+    }
+
+    /// "1 problem", "3 problems": the rules of the model the staged objects break (EDT-2).
+    static func problems(_ count: Int) -> String {
+        count == 1 ? String(localized: "1 problem") : String(localized: "\(count) problems")
+    }
+}
+
+/// A rule of the model an object breaks as staged — what the commit would refuse (EDT-2). The symbol says so as
+/// well as its colour; the sentence keeps the text's own contrast.
+struct IssueLine: View {
+    let issue: ValidationIssue
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .accessibilityHidden(true)
+            if let property = issue.property {
+                Text(property)
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 90, alignment: .leading)
+            }
+            Text(issue.message)
+        }
+        .font(.callout)
+        .lineLimit(2)
+        .padding(.leading, 22)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.spoken(issue))
+    }
+
+    static func spoken(_ issue: ValidationIssue) -> String {
+        issue.property.map { String(localized: "\($0), \(issue.message)") } ?? issue.message
     }
 }
 

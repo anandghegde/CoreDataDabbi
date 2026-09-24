@@ -49,6 +49,9 @@ final class InspectorModel {
     @ObservationIgnored private var structureTask: Task<Void, Never>?
     /// What each task was started for, so that a repeated ask is not a repeated read.
     @ObservationIgnored private var loadedObject: ObjectRef?
+    /// The staged edits the object was read under: a new revision reads it again, so that the inspector shows
+    /// what is staged and not what was (EDT-8).
+    @ObservationIgnored private var loadedRevision = 0
     @ObservationIgnored private var loadedStructure: String?
     @ObservationIgnored private var loadedFrom: ObjectIdentifier?
 
@@ -80,6 +83,14 @@ final class InspectorModel {
 
     var timeZone: TimeZone { context.timeZone }
 
+    /// Bumped whenever what is staged may have changed.
+    var editRevision: Int { context.editing.revision }
+
+    /// The rules of the model `ref` breaks as staged, its fields' and its own (EDT-2).
+    func issues(for ref: ObjectRef) -> [ValidationIssue] {
+        context.editing.issues(for: PendingObjectID(ref))
+    }
+
     /// Reads whatever the current tab needs. Called from the view's `task`, so that a tab nobody looks at costs
     /// nothing — the Structure tab in particular runs four `PRAGMA`s the Details tab has no use for.
     func refresh() {
@@ -107,10 +118,14 @@ final class InspectorModel {
             details = .noObject
             return
         }
-        guard ref != loadedObject else { return }
+        let revision = context.editing.revision
+        guard ref != loadedObject || revision != loadedRevision else { return }
+        // The same object read again for its staged values keeps the old ones up until the new ones arrive.
+        let isAnotherObject = ref != loadedObject
         loadedObject = ref
+        loadedRevision = revision
         detailsTask?.cancel()
-        details = .loading(ref)
+        if isAnotherObject { details = .loading(ref) }
         detailsTask = Task { [weak self] in
             let result: Result<ObjectSnapshot, DabbiError>
             do {

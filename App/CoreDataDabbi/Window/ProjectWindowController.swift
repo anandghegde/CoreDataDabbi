@@ -159,10 +159,66 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         }
     }
 
-    /// Stages the deletion of the rows selected in the grid.
+    /// Stages the deletion of the rows selected in the grid. When the model's delete rules reach further than the
+    /// rows, the window says how, and asks first (EDT-2).
     @IBAction func deleteObjects(_ sender: Any?) {
-        context.editing.delete(panes.centre.browse.grid.selectedObjects.map(PendingObjectID.init))
+        let objects = panes.centre.browse.grid.selectedObjects.map(PendingObjectID.init)
+        context.editing.delete(objects) { [weak self] preview in
+            await self?.confirmDelete(preview) ?? false
+        }
     }
+
+    /// What the delete rules would do besides deleting the rows, and whether to go ahead.
+    private func confirmDelete(_ preview: DeletePreview) async -> Bool {
+        guard let window else { return false }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText =
+            preview.issues.isEmpty
+            ? String(localized: "The delete reaches beyond the selected rows")
+            : String(localized: "The commit would refuse this delete")
+        alert.informativeText = Self.describe(preview)
+        alert.addButton(withTitle: String(localized: "Delete"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.buttons[0].hasDestructiveAction = true
+        guard window.attachedSheet == nil else { return alert.runModal() == .alertFirstButtonReturn }
+        return await withCheckedContinuation { continuation in
+            alert.beginSheetModal(for: window) { response in
+                continuation.resume(returning: response == .alertFirstButtonReturn)
+            }
+        }
+    }
+
+    /// One line per consequence: what goes with the rows, what is left pointing at nothing, what is unlinked,
+    /// and what the commit would refuse.
+    static func describe(_ preview: DeletePreview) -> String {
+        func list(_ groups: [DeletePreview.Group]) -> String {
+            ListFormatter.localizedString(byJoining: groups.map { String(localized: "\($0.entity) (\($0.count))") })
+        }
+        var lines: [String] = []
+        if !preview.cascaded.isEmpty {
+            lines.append(String(localized: "Also deleted, by Cascade rules: \(list(preview.cascaded))"))
+        }
+        if !preview.dangling.isEmpty {
+            let dangling = list(preview.dangling)
+            lines.append(String(localized: "Left pointing at a deleted object, with no rule to unlink it: \(dangling)"))
+        }
+        if !preview.nullified.isEmpty {
+            lines.append(String(localized: "Unlinked, by Nullify rules: \(list(preview.nullified))"))
+        }
+        if !preview.issues.isEmpty {
+            lines.append(String(localized: "The commit would be refused until these are resolved."))
+            // The engine's sentences, as an error's diagnosis is shown: object, property and rule.
+            lines += preview.issues.prefix(Self.issuesListed).map(\.description)
+            if preview.issues.count > Self.issuesListed {
+                lines.append(String(localized: "…and \(preview.issues.count - Self.issuesListed) more"))
+            }
+        }
+        lines.append(String(localized: "The delete can be undone until it is committed."))
+        return lines.joined(separator: "\n")
+    }
+
+    private static let issuesListed = 5
 
     @IBAction func togglePendingChanges(_ sender: Any?) {
         let bottom = panes.centre.bottom

@@ -20,7 +20,12 @@ import Observation
 @Observable
 final class EditingSession {
     /// Everything staged, and where the session's undo stack stands.
-    private(set) var changes: PendingChanges = .none
+    private(set) var changes: PendingChanges = .none {
+        didSet { issuesByObject = Dictionary(grouping: changes.issues, by: \.object) }
+    }
+    /// `changes.issues` by object, for the grid and the inspector, which ask once per field (EDT-2). Observed, so
+    /// that a view reading one object's issues is redrawn when they change.
+    private var issuesByObject: [PendingObjectID: [ValidationIssue]] = [:]
     /// Bumped whenever what is staged may have changed, so that the grid re-reads its rows.
     private(set) var revision = 0
     /// Bumped by each commit that wrote something: the session is in a new generation, and every pager is stale.
@@ -54,6 +59,16 @@ final class EditingSession {
     var hasChanges: Bool { !changes.isEmpty }
     var canCommit: Bool { isEditable && hasChanges && !isCommitting }
 
+    /// The rules of the model `object` breaks as staged: what the commit would refuse (EDT-2).
+    func issues(for object: PendingObjectID) -> [ValidationIssue] {
+        issuesByObject[object] ?? []
+    }
+
+    /// The first rule `property` of `object` breaks, for a field or a cell to be marked with.
+    func issue(for object: PendingObjectID, property: String) -> ValidationIssue? {
+        issuesByObject[object]?.first { $0.property == property }
+    }
+
     // MARK: The session
 
     /// Starts staging edits in `session`, which is editable, backing it up with `backup` before its first commit.
@@ -84,12 +99,25 @@ final class EditingSession {
     }
 
     /// Stages the deletion of `objects`, and whatever their delete rules take along.
-    func delete(_ objects: [PendingObjectID]) {
+    ///
+    /// With `confirm`, the session is asked first what the delete rules would do (EDT-2). When that is more than
+    /// the objects themselves — a Cascade takes others along, references are left pointing at nothing, or the
+    /// commit would be refused — `confirm` is shown it, and the delete is staged only if it answers yes. A plain
+    /// delete is staged without asking. The question is part of the edit's turn: nothing sent after it runs
+    /// before it is answered.
+    func delete(_ objects: [PendingObjectID], confirm: (@MainActor (DeletePreview) async -> Bool)? = nil) {
         guard !objects.isEmpty else { return }
         let name =
             objects.count == 1
             ? String(localized: "Delete \(objects[0].entity)") : String(localized: "Delete \(objects.count) Objects")
-        stage { try await $0.delete(objects, actionName: name) }
+        stage { session in
+            // A preview that cannot be read is no reason not to delete: the delete says what is wrong itself.
+            if let confirm, let preview = try? await session.deletePreview(of: objects), !preview.isPlain {
+                // Declined: what is staged is unchanged, and with it the undo stack.
+                guard await confirm(preview) else { return try await session.pendingChanges() }
+            }
+            return try await session.delete(objects, actionName: name)
+        }
     }
 
     /// Stages a new object of `entity`.

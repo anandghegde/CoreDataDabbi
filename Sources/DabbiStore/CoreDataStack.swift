@@ -200,14 +200,19 @@ final class CoreDataStack: @unchecked Sendable {
         }
     }
 
-    /// What is staged in the edit context, and where its undo stack stands. Inside `perform` only.
+    /// What is staged in the edit context, where its undo stack stands, and which of the model's rules the staged
+    /// objects break (EDT-2). Inside `perform` only.
+    ///
+    /// Validating is reading: it registers nothing with the undo manager, so asking after every edit costs the
+    /// undo stack nothing.
     static func pendingChanges(in context: NSManagedObjectContext, converter: ValueConverter) -> PendingChanges {
         let undoManager = context.undoManager
         return PendingChanges(
             changes: converter.pendingChanges(in: context),
             canUndo: undoManager?.canUndo ?? false, canRedo: undoManager?.canRedo ?? false,
             undoActionName: undoManager?.undoActionName ?? "", redoActionName: undoManager?.redoActionName ?? "",
-            undoDepth: undoDepth(of: context))
+            undoDepth: undoDepth(of: context),
+            issues: ValidationTranslator(converter: converter).issues(in: context))
     }
 
     /// How many edits the undo stack holds. `UndoManager` does not say, and a front end that mirrors the stack
