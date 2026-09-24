@@ -120,11 +120,10 @@ struct ValueConverter: Sendable {
     ///
     /// Reading the identity does not fire the object's fault; reading the label does, which is why this is
     /// only ever called for the objects actually shown.
-    func item(of object: NSManagedObject) -> RelatedObjects.Item? {
-        guard let ref = ObjectRef(uri: object.objectID.uriRepresentation()) else { return nil }
+    func item(of object: NSManagedObject) -> RelatedObjects.Item {
         let display = object.entity.name.flatMap { layouts[$0]?.displayAttribute }
             .flatMap { object.value(forKey: $0) as? String }
-        return RelatedObjects.Item(ref: ref, display: display.flatMap { $0.isEmpty ? nil : $0 })
+        return RelatedObjects.Item(object: pendingID(of: object), display: display.flatMap { $0.isEmpty ? nil : $0 })
     }
 
     func toOne(_ raw: Any?) -> Value {

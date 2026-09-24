@@ -321,7 +321,7 @@ import Testing
         #expect(!model.canReveal)
 
         // Picking one shows it in the inspector without moving the grid (REL-1).
-        model.selectItem(employee.ref)
+        model.selectItem(employee.object)
         for _ in 0..<15 {
             if case .object(let shown, _) = inspector.model.details, shown.ref == employee.ref { break }
             try await Task.sleep(for: .milliseconds(20))
@@ -347,8 +347,8 @@ import Testing
         for _ in 0..<5 { await Task.yield() }
         await grid.whenSettled()
         for _ in 0..<5 { await Task.yield() }
-        #expect(document.context.navigation.current?.entity == employee.ref.entity)
-        #expect(window.subtitle == employee.ref.entity)
+        #expect(document.context.navigation.current?.entity == employee.object.entity)
+        #expect(window.subtitle == employee.object.entity)
         #expect(document.context.navigation.current?.trail.count == 2)
         // The grid found the row it was sent to and highlighted it.
         #expect(grid.tableView.selectedRow >= 0)

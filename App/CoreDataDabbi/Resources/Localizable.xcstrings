@@ -780,10 +780,19 @@
     "New %@" : {
 
     },
+    "New %@, linked to this object" : {
+
+    },
     "New Object" : {
 
     },
     "New Predicate" : {
+
+    },
+    "New Related Object" : {
+
+    },
+    "New related object, linked to this object" : {
 
     },
     "New — not in the store until it is committed" : {
@@ -1417,6 +1426,12 @@
 
     },
     "Unknown App" : {
+
+    },
+    "Unlink" : {
+
+    },
+    "Unlink %@" : {
 
     },
     "Unlinked, by Nullify rules: %@" : {

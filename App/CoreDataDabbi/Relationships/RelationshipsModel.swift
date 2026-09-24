@@ -58,15 +58,20 @@ final class RelationshipsModel {
     /// What names the selected object in a breadcrumb (REL-3).
     private(set) var sourceLabel: String?
 
-    /// An object and one of its relationships: what a list of related objects was read for.
+    /// An object and one of its relationships, and the staged edits they were read under: what a list of related
+    /// objects was read for.
     private struct Followed: Equatable {
         var object: ObjectRef
         var relationship: String
+        var revision: Int
     }
 
     @ObservationIgnored private var rowsTask: Task<Void, Never>?
     @ObservationIgnored private var itemsTask: Task<Void, Never>?
     @ObservationIgnored private var loadedObject: ObjectRef?
+    /// The staged edits the object was read under: a new revision reads it again, so that what is linked and
+    /// unlinked shows here as it is staged (EDT-3, EDT-8).
+    @ObservationIgnored private var loadedRevision = 0
     @ObservationIgnored private var followed: Followed?
     @ObservationIgnored private var loadedFrom: ObjectIdentifier?
 
@@ -79,10 +84,16 @@ final class RelationshipsModel {
     var source: ObjectRef? { context.navigation.current?.focus }
     var sessionIdentity: ObjectIdentifier? { context.session.map(ObjectIdentifier.init) }
 
-    /// The related object being looked at (REL-1). It is not held here but read back from what the inspector and
-    /// the content viewer are showing, so that a click back in the grid takes the highlight off it by itself.
-    var selectedItem: ObjectRef? {
-        guard let source, let inspected = context.inspectedRef, inspected != source else { return nil }
+    /// Bumped whenever what is staged may have changed.
+    var editRevision: Int { context.editing.revision }
+
+    /// The related object being looked at (REL-1): a saved one, or one only inserted and linked here. It is not
+    /// held here but read back from what the inspector and the content viewer are showing, so that a click back
+    /// in the grid takes the highlight off it by itself.
+    var selectedItem: PendingObjectID? {
+        guard let source, let inspected = context.inspectedObject, inspected != PendingObjectID(source) else {
+            return nil
+        }
         return inspected
     }
 
@@ -113,7 +124,11 @@ final class RelationshipsModel {
             forget()
             return
         }
-        if source != loadedObject { loadRows(of: source, from: session) }
+        let revision = context.editing.revision
+        if source != loadedObject || revision != loadedRevision {
+            // The same object read again for what is staged keeps showing what it had until the new read is in.
+            loadRows(of: source, from: session, revision: revision, keepShowing: source == loadedObject)
+        }
         loadItems(from: session)
     }
 
@@ -124,12 +139,15 @@ final class RelationshipsModel {
         sourceLabel = nil
     }
 
-    private func loadRows(of ref: ObjectRef, from session: StoreSession) {
+    private func loadRows(of ref: ObjectRef, from session: StoreSession, revision: Int, keepShowing: Bool) {
         loadedObject = ref
+        loadedRevision = revision
         rowsTask?.cancel()
-        state = .loading(ref)
-        related = nil
-        relatedError = nil
+        if !keepShowing {
+            state = .loading(ref)
+            related = nil
+            relatedError = nil
+        }
         rowsTask = Task { [weak self] in
             let result: Result<ObjectSnapshot, DabbiError>
             do {
@@ -199,12 +217,16 @@ final class RelationshipsModel {
             relatedError = nil
             return
         }
-        let wanted = Followed(object: ref, relationship: name)
+        let wanted = Followed(object: ref, relationship: name, revision: loadedRevision)
         guard wanted != followed else { return }
+        // The same relationship read again for what is staged keeps its list up until the new one is in.
+        let isAnotherList = followed.map { $0.object != ref || $0.relationship != name } ?? true
         followed = wanted
         itemsTask?.cancel()
-        related = nil
-        relatedError = nil
+        if isAnotherList {
+            related = nil
+            relatedError = nil
+        }
         itemsTask = Task { [weak self] in
             let result: Result<RelatedObjects, DabbiError>
             do {
@@ -242,16 +264,17 @@ final class RelationshipsModel {
 
     /// Looks at one of the related objects: the inspector and the content viewer follow it, the grid does not
     /// (REL-1). `nil` gives them the grid's row back.
-    func selectItem(_ ref: ObjectRef?) {
-        context.inspect((ref ?? source).map(PendingObjectID.init))
+    func selectItem(_ object: PendingObjectID?) {
+        context.inspect(object ?? source.map(PendingObjectID.init))
     }
 
     /// Whether there is a related object to jump to — what the Reveal button and the menu item go by (REL-3).
-    var canReveal: Bool { selected != nil && selectedItem != nil }
+    /// One only inserted is in no grid until it is committed.
+    var canReveal: Bool { selected != nil && selectedItem?.ref != nil }
 
     /// Reveals what is picked, for a command that comes from the menu rather than from a row (§8.4).
     func revealSelected() {
-        guard let ref = selectedItem else { return }
+        guard let ref = selectedItem?.ref else { return }
         reveal(ref)
     }
 
@@ -260,6 +283,39 @@ final class RelationshipsModel {
         guard let relationship = selected else { return }
         context.reveal(
             ref, from: source, labelled: sourceLabel ?? source?.description ?? ref.entity, through: relationship)
+    }
+
+    // MARK: Editing (EDT-3)
+
+    /// Whether the relationship being followed can be changed from here: the store is open for editing.
+    var canEdit: Bool { context.editing.isEditable && source != nil && selectedRow != nil }
+
+    /// What a new related object can be: the followed to-many's destination and its sub-entities, leaving out
+    /// the abstract ones. Empty for a to-one, whose new object is made with the picker that sets it.
+    var insertableEntities: [String] {
+        guard let relationship = selectedRow?.relationship, relationship.isToMany, let model = context.model else {
+            return []
+        }
+        return model.entityAndDescendants(of: relationship.destinationEntity).filter { !$0.isAbstract }.map(\.name)
+    }
+
+    /// Stages a new object of `entity`, linked to the selected object through the followed relationship, and
+    /// shows it in the inspector to be filled in.
+    func insertRelated(_ entity: String) {
+        guard canEdit, insertableEntities.contains(entity), let source, let name = selected else { return }
+        context.editing.insertRelatedObject(of: entity, to: PendingObjectID(source), through: name) {
+            [weak self] object in self?.context.inspect(object)
+        }
+    }
+
+    /// Takes `item` out of the followed relationship; a to-one is emptied. The object itself stays. Only what the
+    /// list shows is taken out: the inspector may be showing an object from somewhere else.
+    func unlink(_ item: PendingObjectID) {
+        guard canEdit, let source, let name = selected, related?.items.contains(where: { $0.object == item }) == true
+        else { return }
+        // It is no longer on this side to be looked at.
+        if selectedItem == item { selectItem(nil) }
+        context.editing.unlink([item], from: PendingObjectID(source), through: name)
     }
 
     /// Returns once the panel has read what it is showing. For the tests.

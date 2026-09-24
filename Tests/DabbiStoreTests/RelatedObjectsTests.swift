@@ -58,9 +58,9 @@ import Testing
         #expect(!employees.isTruncated)
         // The fixture spreads 25 employees over 4 departments; every one of them is an Employee or a Manager.
         #expect(employees.count > 0)
-        #expect(employees.items.allSatisfy { ["Employee", "Manager"].contains($0.ref.entity) })
+        #expect(employees.items.allSatisfy { ["Employee", "Manager"].contains($0.object.entity) })
         // Listed in object-ID order, so the same relationship reads the same way twice.
-        #expect(employees.items.map(\.ref.pk) == employees.items.map(\.ref.pk).sorted())
+        #expect(employees.items.compactMap(\.ref?.pk) == employees.items.compactMap(\.ref?.pk).sorted())
         // Every Party has a name, which is what labels it wherever it is pointed at.
         #expect(employees.items.allSatisfy { $0.display?.isEmpty == false })
         #expect(employees.items.first?.label == employees.items.first?.display)
@@ -76,7 +76,7 @@ import Testing
         #expect(organisation.destinationEntity == "Organisation")
         #expect(organisation.count == 1)
         #expect(organisation.items.count == 1)
-        #expect(organisation.items.first?.ref.entity == "Organisation")
+        #expect(organisation.items.first?.object.entity == "Organisation")
     }
 
     @Test func readsBothEndsOfAManyToMany() async throws {
@@ -84,11 +84,34 @@ import Testing
         defer { Task { await session.close() } }
         let person = try await first("Person", in: session)
         let tags = try await session.related(to: person, through: "tags")
-        guard let tag = tags.items.first else { return }  // Not every person is tagged.
+        guard let tag = tags.items.first?.ref else { return }  // Not every person is tagged.
 
-        let people = try await session.related(to: tag.ref, through: "people")
+        let people = try await session.related(to: tag, through: "people")
         #expect(people.destinationEntity == "Person")
         #expect(people.items.contains { $0.ref == person })
+    }
+
+    /// An item was a `ref` and a `display` until objects only inserted could be listed; that form still reads
+    /// and is still written for every saved object.
+    @Test func anItemKeepsTheFormItHadForSavedObjects() throws {
+        struct EarlierItem: Codable, Equatable {
+            var ref: ObjectRef
+            var display: String?
+        }
+        let uri = URL(string: "x-coredata://4B1D5E9A-0000-4000-8000-000000000001/Employee/p7")!
+        let ref = try #require(ObjectRef(uri: uri))
+        let item = RelatedObjects.Item(ref: ref, display: "Ada")
+
+        let written = try JSONEncoder().encode(item)
+        #expect(try JSONDecoder().decode(EarlierItem.self, from: written) == EarlierItem(ref: ref, display: "Ada"))
+        let earlier = try JSONEncoder().encode(EarlierItem(ref: ref, display: "Ada"))
+        #expect(try JSONDecoder().decode(RelatedObjects.Item.self, from: earlier) == item)
+
+        // One only inserted has no reference, and round-trips by the identity it was staged under.
+        let staged = PendingObjectID(uri: URL(string: "x-coredata:///Employee/t0A1B2C3D")!, entity: "Employee")
+        let inserted = RelatedObjects.Item(object: staged)
+        let decoded = try JSONDecoder().decode(RelatedObjects.Item.self, from: JSONEncoder().encode(inserted))
+        #expect(decoded == inserted && decoded.ref == nil)
     }
 
     @Test func saysHowManyThereAreWhenItShowsFewer() async throws {
