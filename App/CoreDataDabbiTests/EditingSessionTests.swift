@@ -393,11 +393,13 @@ import Testing
         #expect(picker.items.count == picker.matching && picker.matching > before.count)
         #expect(Set(picker.items.filter(\.isLinked).map(\.ref)) == Set(before))
 
-        // What is typed narrows it as the grid's quick filter does (PRD-6).
-        picker.term = "Manager 1"
+        // What is typed narrows it as the grid's quick filter does (PRD-6): the fixture's five managers, some of
+        // them in this department and some not. Which are is up to the keys the fixture's save handed out.
+        picker.term = "Manager"
         await picker.whenSettled()
-        let manager = try #require(picker.items.first { $0.label == "Manager 1" })
-        #expect(!manager.isLinked)
+        #expect(picker.matching == 5)
+        #expect(picker.items.allSatisfy { $0.label.hasPrefix("Manager ") })
+        let manager = try #require(picker.items.first { !$0.isLinked })
 
         // What is linked already is not linked again; what is chosen is linked as one edit.
         picker.selection = [before[0]]
