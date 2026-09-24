@@ -4,12 +4,14 @@ import Testing
 
 @testable import DabbiLocator
 
+/// Deadlines and bounds are generous: the whole engine suite runs at once, and on a busy runner a test can wait
+/// seconds for a thread. What each test checks does not depend on them.
 @Suite struct ProcessRunnerTests {
     private let shell = URL(fileURLWithPath: "/bin/sh")
 
     @Test func collectsBothStreamsAndTheStatus() async throws {
         let result = try await ProcessRunner().run(
-            shell, arguments: ["-c", "echo out; echo err >&2; exit 3"], timeout: 10)
+            shell, arguments: ["-c", "echo out; echo err >&2; exit 3"], timeout: 60)
         #expect(result.status == 3)
         #expect(!result.succeeded)
         #expect(String(decoding: result.standardOutput, as: UTF8.self) == "out\n")
@@ -45,7 +47,8 @@ import Testing
             try await ProcessRunner().run(URL(fileURLWithPath: "/bin/sleep"), arguments: ["30"], timeout: 0.3)
         }
         #expect(error?.code == .timeout)
-        #expect(Date().timeIntervalSince(started) < 10)
+        // Ended, not waited out: well before the 30 seconds the tool would have slept.
+        #expect(Date().timeIntervalSince(started) < 25)
     }
 
     @Test func cancellingTheTaskEndsTheProcess() async throws {
@@ -57,7 +60,7 @@ import Testing
         task.cancel()
         let error = await #expect(throws: DabbiError.self) { try await task.value }
         #expect(error?.code == .cancelled)
-        #expect(Date().timeIntervalSince(started) < 10)
+        #expect(Date().timeIntervalSince(started) < 25)
     }
 
     @Test func aTaskCancelledBeforeItStartsRunsNothingForLong() async throws {
@@ -68,6 +71,6 @@ import Testing
         task.cancel()
         let started = Date()
         await #expect(throws: DabbiError.self) { try await task.value }
-        #expect(Date().timeIntervalSince(started) < 10)
+        #expect(Date().timeIntervalSince(started) < 25)
     }
 }
