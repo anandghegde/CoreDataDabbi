@@ -54,7 +54,7 @@ struct DetailsTab: View {
                         name: property.name, type: property.type,
                         rendered: GridValue.render(property.value, timeZone: model.timeZone),
                         issue: issues.first { $0.property == property.name },
-                        editing: editing(property, of: ref))
+                        editing: model.fieldEditing(property.name, value: property.value, of: ref))
                 }
             }
             .padding(.vertical, 10)
@@ -105,20 +105,6 @@ struct DetailsTab: View {
                             : String(localized: "To-one → \($0.destinationEntity)")
                     })
         }
-    }
-
-    /// How `property` of `ref` is edited, when the store is open for editing and it is an attribute a person can
-    /// type (EDT-3).
-    private func editing(_ property: Property, of ref: ObjectRef) -> FieldEditing? {
-        guard let attribute = model.editableAttribute(property.name, of: ref) else { return nil }
-        let model = self.model
-        var clear: (@MainActor () -> Void)?
-        if attribute.isOptional, !property.value.isNull {
-            clear = { model.clear(attribute, of: ref) }
-        }
-        return FieldEditing(
-            text: ValueText.text(for: property.value, timeZone: model.timeZone),
-            stage: { model.stage($0, for: attribute, of: ref) }, clear: clear)
     }
 
     /// “name: sample-3”, and what is wrong with it when something is.

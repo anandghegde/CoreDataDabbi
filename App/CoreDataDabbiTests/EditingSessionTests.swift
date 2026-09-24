@@ -394,6 +394,50 @@ import Testing
         document.close()
     }
 
+    @Test func aCellIsEditedWhereItIs() async throws {
+        let folder = try AppFixtures.scratchFolder()
+        let store = try ProjectRepairTests.copyStore(to: folder)
+        let document = try ProjectDocument(type: ProjectPackage.typeIdentifier)
+        document.context.workingCopiesDirectory = try AppFixtures.scratchFolder("copies")
+        document.context.backupsDirectory = folder.appendingPathComponent("Backups", isDirectory: true)
+        document.context.simulators = nil
+        document.context.adoptStore(at: store)
+        document.makeWindowControllers()
+        let controller = try #require(document.windowControllers.first as? ProjectWindowController)
+        let window = try #require(controller.window)
+        window.setFrame(NSRect(x: 0, y: 0, width: 1320, height: 820), display: false)
+        window.orderFront(nil)
+        await settle(document)
+        let grid = try #require(window.firstController(of: GridViewController.self))
+        await grid.whenSettled()
+        let number = try #require(grid.tableView.tableColumns.firstIndex { $0.identifier.rawValue == "int32Value" })
+        let objectID = try #require(
+            grid.tableView.tableColumns.firstIndex { $0.identifier.rawValue == ColumnLayout.objectIDColumn })
+
+        // A read-only store has no cell to edit (EDT-1).
+        #expect(!grid.editCell(row: 0, columnIndex: number))
+
+        document.context.setAccessMode(.editable)
+        await settle(document)
+        await grid.whenSettled()
+        // The grid's own columns are not fields of the row.
+        #expect(!grid.editCell(row: 0, columnIndex: objectID))
+        #expect(grid.editCell(row: 0, columnIndex: number))
+        let cell = try #require(grid.editedCell)
+        #expect(cell.popover.isShown)
+
+        // What is typed is read as the attribute's type, and staged like any other edit (EDT-3, EDT-8).
+        #expect(cell.editing.stage("twelve") == "This is not a whole number.")
+        #expect(cell.editing.stage("12") == nil)
+        cell.popover.close()
+        await settle(document)
+        await grid.whenSettled()
+        #expect(document.context.editing.changes.count(of: .updated) == 1)
+        let column = try #require(grid.columns.first { $0.property == "int32Value" })
+        #expect(grid.value(at: 0, column: column)?.text == "12")
+        document.close()
+    }
+
     private func settle(_ document: ProjectDocument) async {
         await document.context.whenSettled()
         for _ in 0..<5 { await Task.yield() }

@@ -72,6 +72,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         tableView.setAccessibilityLabel(String(localized: "Rows"))
         tableView.target = self
         tableView.action = #selector(cellClicked)
+        tableView.doubleAction = #selector(cellDoubleClicked)
 
         let headerMenu = NSMenu()
         headerMenu.delegate = self
@@ -471,6 +472,36 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         let clicked = tableView.clickedColumn
         guard clicked >= 0, clicked < tableView.tableColumns.count else { return }
         focus(onColumnAt: clicked)
+    }
+
+    // MARK: Editing (EDT-3)
+
+    /// The cell being edited: what staging its text does, and the popover it is typed into.
+    private(set) var editedCell: (editing: FieldEditing, popover: NSPopover)?
+
+    @objc private func cellDoubleClicked(_ sender: Any?) {
+        editCell(row: tableView.clickedRow, columnIndex: tableView.clickedColumn)
+    }
+
+    /// Opens an editor over the cell at `row` and `index` when its value is an attribute that can be typed and the
+    /// store is open for editing, and says whether it did. What is typed is staged like any other edit, and comes
+    /// back through the rows being read again.
+    @discardableResult
+    func editCell(row: Int, columnIndex index: Int) -> Bool {
+        guard index >= 0, index < tableView.tableColumns.count, let column = column(for: tableView.tableColumns[index]),
+            case .attribute = column.kind, let rows, row >= 0, row < rows.count,
+            case .row(let snapshot) = rows.row(at: row)
+        else { return false }
+        // Rows carry the columns the pager was last told to read, which is the visible set.
+        let read = rows.columns ?? rows.handle.columns
+        guard let position = read.index(of: column.property), position < snapshot.values.count,
+            let editing = context.fieldEditing(column.property, value: snapshot.values[position], of: snapshot.ref)
+        else { return false }
+        editedCell?.popover.close()
+        let popover = CellEditor.show(
+            editing, named: column.title, relativeTo: tableView.frameOfCell(atColumn: index, row: row), of: tableView)
+        editedCell = (editing, popover)
+        return true
     }
 
     /// Reads a column of the selected row, as a click on it would. The keyboard has no way to say this yet;
