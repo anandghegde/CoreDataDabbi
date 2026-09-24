@@ -84,9 +84,9 @@ import Testing
         defer { Task { await session.close() } }
         let person = try await first("Person", in: session)
         let tags = try await session.related(to: person, through: "tags")
-        guard let tag = tags.items.first else { return }  // Not every person is tagged.
+        guard let tag = tags.items.first?.ref else { return }  // Not every person is tagged.
 
-        let people = try await session.related(to: tag.ref, through: "people")
+        let people = try await session.related(to: tag, through: "people")
         #expect(people.destinationEntity == "Person")
         #expect(people.items.contains { $0.ref == person })
     }
