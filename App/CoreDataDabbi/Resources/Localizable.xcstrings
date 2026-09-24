@@ -552,6 +552,9 @@
     "Edit Note…" : {
       "comment" : "Snapshot context menu"
     },
+    "Edit Value" : {
+
+    },
     "Editable" : {
 
     },
@@ -1102,6 +1105,9 @@
 
     },
     "Services" : {
+
+    },
+    "Set to Nil" : {
 
     },
     "Shared App Groups" : {

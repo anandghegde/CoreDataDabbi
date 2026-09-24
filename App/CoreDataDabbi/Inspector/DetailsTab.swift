@@ -3,8 +3,8 @@ import SwiftUI
 
 /// Every stored property of the selected object, in one column (BRW-7).
 ///
-/// Read-only in M1. The fields are laid out as they will be when they become editable in M3, so that unlocking
-/// a store changes what the rows do and not where anything is.
+/// When the store is open for editing, attribute values are edited in place (EDT-3): unlocking a store changes
+/// what the rows do and not where anything is.
 struct DetailsTab: View {
     let model: InspectorModel
 
@@ -50,12 +50,18 @@ struct DetailsTab: View {
                 }
                 Divider().padding(.bottom, 6)
                 ForEach(fields, id: \.name) { property in
-                    row(property, issue: issues.first { $0.property == property.name })
+                    FieldRow(
+                        name: property.name, type: property.type,
+                        rendered: GridValue.render(property.value, timeZone: model.timeZone),
+                        issue: issues.first { $0.property == property.name },
+                        editing: editing(property, of: ref))
                 }
             }
             .padding(.vertical, 10)
         }
         .scrollContentBackground(.hidden)
+        // Rows are per object: a field half typed into is never carried over to the next one.
+        .id(ref)
     }
 
     private func header(_ ref: ObjectRef) -> some View {
@@ -101,55 +107,23 @@ struct DetailsTab: View {
         }
     }
 
-    /// One field, and under it the rule of the model its staged value breaks, when it breaks one (EDT-2).
-    @ViewBuilder
-    private func row(_ property: Property, issue: ValidationIssue?) -> some View {
-        let rendered = GridValue.render(property.value, timeZone: model.timeZone)
-        VStack(alignment: .leading, spacing: 1) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(property.name)
-                    .font(.callout.weight(.medium))
-                if let type = property.type {
-                    Text(type)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            Text(rendered.text)
-                .font(.body)
-                .italic(rendered.emphasis == .absent)
-                .foregroundStyle(colour(of: rendered.emphasis))
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-            if let issue {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    Text(issue.message)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .font(.caption)
-            }
+    /// How `property` of `ref` is edited, when the store is open for editing and it is an attribute a person can
+    /// type (EDT-3).
+    private func editing(_ property: Property, of ref: ObjectRef) -> FieldEditing? {
+        guard let attribute = model.editableAttribute(property.name, of: ref) else { return nil }
+        let model = self.model
+        var clear: (@MainActor () -> Void)?
+        if attribute.isOptional, !property.value.isNull {
+            clear = { model.clear(attribute, of: ref) }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .help(rendered.tooltip ?? "")
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Self.spoken(property.name, rendered.text, issue: issue))
+        return FieldEditing(
+            text: ValueText.text(for: property.value, timeZone: model.timeZone),
+            stage: { model.stage($0, for: attribute, of: ref) }, clear: clear)
     }
 
     /// “name: sample-3”, and what is wrong with it when something is.
     static func spoken(_ name: String, _ value: String, issue: ValidationIssue?) -> String {
         let field = String(localized: "\(name): \(value)")
         return issue.map { String(localized: "\(field), \($0.message)") } ?? field
-    }
-
-    private func colour(of emphasis: GridValue.Emphasis) -> Color {
-        switch emphasis {
-        case .value: .primary
-        case .absent: .secondary
-        case .reference: .accentColor
-        }
     }
 }
