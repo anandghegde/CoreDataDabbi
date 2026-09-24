@@ -173,10 +173,12 @@ public actor StoreSession {
     /// Appends the next rows of a pager whose fetch limit cut it short — “Load more” (BRW-11).
     ///
     /// The handle that comes back names the same list, only longer; pages cut with the old handle stay valid.
+    /// A handle the list has outgrown — another request extended it meanwhile — gets the list as it is: requests
+    /// made with the same handle extend it once, whichever order they reach the session in.
     /// - Parameter count: how many rows to add; by default as many as the spec's limit.
     public func loadMore(_ handle: PagerHandle, count: Int? = nil) async throws -> PagerHandle {
         let pager = try pager(for: handle)
-        guard pager.hasMore else { return Self.handle(handle, reflecting: pager) }
+        guard pager.hasMore, pager.ids.count <= handle.count else { return Self.handle(handle, reflecting: pager) }
         let batch = max(1, count ?? handle.spec.limit ?? Self.pageSize)
         let offset = pager.ids.count
         let request = try fetchRequest(
