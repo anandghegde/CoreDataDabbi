@@ -69,7 +69,7 @@ final class ContentModel {
 
     /// What the window is pointing at, whether or not it has been read yet.
     var field: Field? {
-        guard let ref = context.inspectedObject, let property = context.focusedProperty else { return nil }
+        guard let ref = context.inspectedRef, let property = context.focusedProperty else { return nil }
         return Field(ref: ref, property: property, typeName: typeName(of: property, in: ref.entity))
     }
 

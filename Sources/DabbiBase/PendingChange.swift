@@ -119,12 +119,18 @@ public struct CommitSummary: Sendable, Hashable, Codable {
     public let deleted: Int
     /// The session generation after the commit; pages and pagers from before it are stale.
     public let generation: Int
+    /// The references the commit gave the objects that were only inserted, by the identities they were staged
+    /// under: a front end showing one of them goes on showing it.
+    public let insertedRefs: [PendingObjectID: ObjectRef]
 
-    public init(inserted: Int, updated: Int, deleted: Int, generation: Int) {
+    public init(
+        inserted: Int, updated: Int, deleted: Int, generation: Int, insertedRefs: [PendingObjectID: ObjectRef] = [:]
+    ) {
         self.inserted = inserted
         self.updated = updated
         self.deleted = deleted
         self.generation = generation
+        self.insertedRefs = insertedRefs
     }
 
     public var total: Int { inserted + updated + deleted }

@@ -95,13 +95,13 @@ import Testing
         model.selectItem(item.ref)
 
         // The inspector and the content viewer follow the panel; the grid stays on the row it had (REL-1).
-        #expect(context.inspectedObject == item.ref)
+        #expect(context.inspectedRef == item.ref)
         #expect(context.navigation.current?.focus == source)
         #expect(context.navigation.current?.entity == "Department")
 
         // Letting go of it gives them the grid's row back.
         model.selectItem(nil)
-        #expect(context.inspectedObject == source)
+        #expect(context.inspectedRef == source)
     }
 
     @Test func jumpsTheGridToARelatedObjectAndRemembersTheWayThere() async throws {
@@ -115,7 +115,7 @@ import Testing
 
         #expect(context.navigation.current?.entity == item.ref.entity)
         #expect(context.navigation.current?.focus == item.ref)
-        #expect(context.inspectedObject == item.ref)
+        #expect(context.inspectedRef == item.ref)
         #expect(context.navigation.current?.trail == [label, "employees"])
         // And it is somewhere to come back from.
         #expect(context.navigation.canGoBack)

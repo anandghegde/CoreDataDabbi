@@ -176,6 +176,8 @@ enum MainMenu {
                 String(localized: "Commit to Store"), #selector(ProjectWindowController.commitChanges(_:)), "\r"))
         menu.addItem(
             item(String(localized: "Discard Changes…"), #selector(ProjectWindowController.discardChanges(_:))))
+        // An object of the grid's entity, filled in in the inspector (EDT-3). The PRD gives it Command-N.
+        menu.addItem(item(String(localized: "New Object"), #selector(ProjectWindowController.newObject(_:)), "n"))
         menu.addItem(
             item(
                 String(localized: "Delete Rows"), #selector(ProjectWindowController.deleteObjects(_:)),

@@ -165,6 +165,14 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         }
     }
 
+    /// Stages a new object of the grid's entity, and opens the inspector for its fields to be filled in (EDT-3).
+    @IBAction func newObject(_ sender: Any?) {
+        guard context.canInsertObject else { return }
+        _ = panes.reveal(pane: Pane.inspector)
+        panes.inspector.model.tab = .details
+        context.insertObject()
+    }
+
     /// Stages the deletion of the rows selected in the grid. When the model's delete rules reach further than the
     /// rows, the window says how, and asks first (EDT-2).
     @IBAction func deleteObjects(_ sender: Any?) {
@@ -484,6 +492,8 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
             return context.editing.canCommit
         case #selector(discardChanges(_:)):
             return context.editing.hasChanges && !context.editing.isCommitting
+        case #selector(newObject(_:)):
+            return context.canInsertObject && !context.tracking.isShowingLog
         case #selector(deleteObjects(_:)):
             // Only from the grid: elsewhere ⌘⌫ is the text field's, deleting to the start of the line.
             return context.editing.isEditable && window?.firstResponder === panes.centre.browse.grid.tableView

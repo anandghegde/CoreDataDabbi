@@ -83,3 +83,26 @@ public struct ObjectSnapshot: Sendable, Hashable, Codable {
         columns.index(of: property).map { row.values[$0] }
     }
 }
+
+/// All values of a single object as staged: what the inspector shows (EDT-3, EDT-8).
+///
+/// Unlike an `ObjectSnapshot` it can hold an object that has only been inserted, which has no `ObjectRef` until
+/// the commit gives it a primary key. A read-only session stages nothing, and this is the object as saved.
+public struct StagedObject: Sendable, Hashable, Codable {
+    public let object: PendingObjectID
+    public let columns: ColumnSet
+    /// Values in `columns` order.
+    public let values: [Value]
+    public let generation: Int
+
+    public init(object: PendingObjectID, columns: ColumnSet, values: [Value], generation: Int) {
+        self.object = object
+        self.columns = columns
+        self.values = values
+        self.generation = generation
+    }
+
+    public subscript(property: String) -> Value? {
+        columns.index(of: property).flatMap { values.indices.contains($0) ? values[$0] : nil }
+    }
+}

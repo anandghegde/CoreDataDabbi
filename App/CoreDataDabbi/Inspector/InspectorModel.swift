@@ -30,13 +30,14 @@ final class InspectorModel {
         }
     }
 
-    /// What has been read for the object the grid has selected.
+    /// What has been read for the object being inspected.
     enum Details {
         /// Nothing is selected: the grid has no focus, or the store is not open.
         case noObject
-        case loading(ObjectRef)
-        case object(ObjectRef, ObjectSnapshot)
-        case failed(ObjectRef, DabbiError)
+        case loading(PendingObjectID)
+        /// The object as staged; one only inserted included (EDT-3).
+        case object(PendingObjectID, StagedObject)
+        case failed(PendingObjectID, DabbiError)
     }
 
     private let context: ProjectContext
@@ -48,7 +49,7 @@ final class InspectorModel {
     @ObservationIgnored private var detailsTask: Task<Void, Never>?
     @ObservationIgnored private var structureTask: Task<Void, Never>?
     /// What each task was started for, so that a repeated ask is not a repeated read.
-    @ObservationIgnored private var loadedObject: ObjectRef?
+    @ObservationIgnored private var loadedObject: PendingObjectID?
     /// The staged edits the object was read under: a new revision reads it again, so that the inspector shows
     /// what is staged and not what was (EDT-8).
     @ObservationIgnored private var loadedRevision = 0
@@ -71,9 +72,14 @@ final class InspectorModel {
         return context.model?.entity(named: name)
     }
 
-    /// The object being looked at — the grid's selection, or one picked in the relationships panel (REL-1) —
-    /// and which store it belongs to: what the inspector's reading depends on.
-    var focusedObject: ObjectRef? { context.inspectedObject }
+    /// The entity `object` is of, which is not the grid's when it was picked in the relationships panel.
+    func entity(of object: PendingObjectID) -> EntityDescription? {
+        context.model?.entity(named: object.entity)
+    }
+
+    /// The object being looked at — the grid's selection, one picked in the relationships panel (REL-1), or one
+    /// only inserted (EDT-3) — and which store it belongs to: what the inspector's reading depends on.
+    var focusedObject: PendingObjectID? { context.inspectedObject }
     var sessionIdentity: ObjectIdentifier? { context.session.map(ObjectIdentifier.init) }
 
     var facts: EntityFacts? {
@@ -86,30 +92,30 @@ final class InspectorModel {
     /// Bumped whenever what is staged may have changed.
     var editRevision: Int { context.editing.revision }
 
-    /// The rules of the model `ref` breaks as staged, its fields' and its own (EDT-2).
-    func issues(for ref: ObjectRef) -> [ValidationIssue] {
-        context.editing.issues(for: PendingObjectID(ref))
+    /// The rules of the model `object` breaks as staged, its fields' and its own (EDT-2).
+    func issues(for object: PendingObjectID) -> [ValidationIssue] {
+        context.editing.issues(for: object)
     }
 
     // MARK: Editing (EDT-3)
 
     // The rules are the context's, so that the grid's cells edit the same way (`ValueEditing.swift`).
 
-    func editableAttribute(_ name: String, of ref: ObjectRef) -> AttributeDescription? {
-        context.editableAttribute(name, of: ref)
+    func editableAttribute(_ name: String, of object: PendingObjectID) -> AttributeDescription? {
+        context.editableAttribute(name, of: object)
     }
 
-    func stage(_ text: String, for attribute: AttributeDescription, of ref: ObjectRef) -> String? {
-        context.stage(text, for: attribute, of: ref)
+    func stage(_ text: String, for attribute: AttributeDescription, of object: PendingObjectID) -> String? {
+        context.stage(text, for: attribute, of: object)
     }
 
-    func clear(_ attribute: AttributeDescription, of ref: ObjectRef) {
-        context.clear(attribute, of: ref)
+    func clear(_ attribute: AttributeDescription, of object: PendingObjectID) {
+        context.clear(attribute, of: object)
     }
 
-    /// How the field `name` of `ref`, which holds `value` now, is edited — `nil` when it cannot be typed.
-    func fieldEditing(_ name: String, value: Value, of ref: ObjectRef) -> FieldEditing? {
-        context.fieldEditing(name, value: value, of: ref)
+    /// How the field `name` of `object`, which holds `value` now, is edited — `nil` when it cannot be typed.
+    func fieldEditing(_ name: String, value: Value, of object: PendingObjectID) -> FieldEditing? {
+        context.fieldEditing(name, value: value, of: object)
     }
 
     /// Reads whatever the current tab needs. Called from the view's `task`, so that a tab nobody looks at costs
@@ -133,33 +139,34 @@ final class InspectorModel {
     // MARK: Details
 
     private func loadDetails(from session: StoreSession?) {
-        guard let session, let ref = context.inspectedObject else {
+        guard let session, let object = context.inspectedObject else {
             detailsTask?.cancel()
             loadedObject = nil
             details = .noObject
             return
         }
         let revision = context.editing.revision
-        guard ref != loadedObject || revision != loadedRevision else { return }
+        guard object != loadedObject || revision != loadedRevision else { return }
         // The same object read again for its staged values keeps the old ones up until the new ones arrive.
-        let isAnotherObject = ref != loadedObject
-        loadedObject = ref
+        let isAnotherObject = object != loadedObject
+        loadedObject = object
         loadedRevision = revision
         detailsTask?.cancel()
-        if isAnotherObject { details = .loading(ref) }
+        if isAnotherObject { details = .loading(object) }
         detailsTask = Task { [weak self] in
-            let result: Result<ObjectSnapshot, DabbiError>
+            let result: Result<StagedObject, DabbiError>
             do {
-                result = .success(try await session.object(ref))
+                // As staged: an object only inserted has no reference to read it by (EDT-3).
+                result = .success(try await session.stagedObject(object))
             } catch let error as DabbiError {
                 result = .failure(error)
             } catch {
                 result = .failure(DabbiError(.internal, "The object could not be read.", underlying: error))
             }
-            guard !Task.isCancelled, let self, self.loadedObject == ref else { return }
+            guard !Task.isCancelled, let self, self.loadedObject == object else { return }
             switch result {
-            case .success(let snapshot): self.details = .object(ref, snapshot)
-            case .failure(let error): self.details = .failed(ref, error)
+            case .success(let staged): self.details = .object(object, staged)
+            case .failure(let error): self.details = .failed(object, error)
             }
         }
     }

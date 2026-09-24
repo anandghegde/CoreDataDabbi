@@ -225,7 +225,7 @@ import Testing
             document.close()
             return
         }
-        #expect(ref == focus)
+        #expect(ref.ref == focus)
         #expect(snapshot.columns.properties.contains("name"))
         #expect(snapshot["name"]?.displayString(timeZone: .gmt).hasPrefix("Department") == true)
         // A Department has a head and an organisation whether or not this one uses them.
@@ -323,7 +323,7 @@ import Testing
         // Picking one shows it in the inspector without moving the grid (REL-1).
         model.selectItem(employee.ref)
         for _ in 0..<15 {
-            if case .object(let shown, _) = inspector.model.details, shown == employee.ref { break }
+            if case .object(let shown, _) = inspector.model.details, shown.ref == employee.ref { break }
             try await Task.sleep(for: .milliseconds(20))
         }
         await inspector.model.whenSettled()
@@ -332,7 +332,7 @@ import Testing
             document.close()
             return
         }
-        #expect(shown == employee.ref)
+        #expect(shown.ref == employee.ref)
         #expect(grid.tableView.selectedRow == 0)
         #expect(document.context.navigation.current?.entity == "Department")
 

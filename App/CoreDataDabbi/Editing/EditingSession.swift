@@ -120,10 +120,15 @@ final class EditingSession {
         }
     }
 
-    /// Stages a new object of `entity`.
-    func insertObject(of entity: String) {
+    /// Stages a new object of `entity`, and hands `inserted` the identity it is staged under — once it is, and
+    /// only if this session is still the one attached.
+    func insertObject(of entity: String, inserted: (@MainActor (PendingObjectID) -> Void)? = nil) {
         let name = String(localized: "New \(entity)")
-        stage { try await $0.insertObject(entity: entity, actionName: name).changes }
+        stage { [weak self] session in
+            let (object, changes) = try await session.insertObject(entity: entity, actionName: name)
+            if self?.session === session { inserted?(object) }
+            return changes
+        }
     }
 
     /// Throws away everything staged. The file is not touched.

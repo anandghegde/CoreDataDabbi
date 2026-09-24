@@ -45,8 +45,9 @@ final class ProjectContext {
     /// columns, and the one being read is gone with it.
     @ObservationIgnored private var focusedPropertyEntity: String?
     /// The object the inspector and the content viewer read: the grid's selection, or — while one is picked in
-    /// the relationships panel — a related object the grid is not showing (REL-1).
-    private(set) var inspectedObject: ObjectRef?
+    /// the relationships panel — a related object the grid is not showing (REL-1), or one only inserted, which
+    /// no grid shows until it is committed (EDT-3).
+    private(set) var inspectedObject: PendingObjectID?
     /// Whose store this is, for the status capsule: `nil` for a store picked as a file, whose path says it.
     private(set) var locationOrigin: String?
     /// Where the store may be now, when it is not where the project says (PRJ-12). Empty otherwise.
@@ -105,7 +106,10 @@ final class ProjectContext {
         // start tracking again on what is there now (Appendix D).
         tracking.onStoreReplaced = { [weak self] in self?.openStore() }
         // The first commit of a session backs the store up, and the sidebar lists backups.
-        editing.onCommitFinished = { [weak self] in self?.snapshots.refresh() }
+        editing.onCommitFinished = { [weak self] in
+            self?.snapshots.refresh()
+            self?.followCommittedObject()
+        }
     }
 
     // MARK: Reading
@@ -327,19 +331,49 @@ final class ProjectContext {
 
     /// The grid's selection moved. The same place, seen differently — not somewhere to go back to (REL-3).
     func focus(on object: ObjectRef?) {
-        inspect(object)
+        inspect(object.map(PendingObjectID.init))
         guard navigation.current?.focus != object else { return }
         navigation.amend { $0.focus = object }
     }
 
-    /// A related object was picked in the relationships panel: the inspector and the content viewer follow it,
-    /// and the grid stays where it is (REL-1). Revealing it is a separate, deliberate step.
-    func inspect(_ object: ObjectRef?) {
+    /// A related object was picked in the relationships panel, or an object in the Pending Changes panel: the
+    /// inspector and the content viewer follow it, and the grid stays where it is (REL-1). Revealing it is a
+    /// separate, deliberate step.
+    func inspect(_ object: PendingObjectID?) {
         guard inspectedObject != object else { return }
         // Another entity's object has other properties; the one that was being read is not among them. Losing
         // the selection altogether is not the same thing: the next row brings the same column back.
         if let entity = object?.entity, entity != focusedPropertyEntity { forgetProperty() }
         inspectedObject = object
+    }
+
+    /// The inspected object's reference; `nil` while it is only inserted, and has none yet. What has no
+    /// reference has no relationships to follow and no stored bytes to read.
+    var inspectedRef: ObjectRef? { inspectedObject?.ref }
+
+    /// Whether New Object can stage one: the store is open for editing, and the grid shows an entity that can
+    /// have objects of its own.
+    var canInsertObject: Bool {
+        guard editing.isEditable, let entity = selectedEntity.flatMap({ model?.entity(named: $0) }) else {
+            return false
+        }
+        return !entity.isAbstract
+    }
+
+    /// Stages a new object of the grid's entity and shows it in the inspector, where its fields are filled in
+    /// (EDT-3). The grid does not list it until it is committed.
+    func insertObject() {
+        guard canInsertObject, let entity = selectedEntity else { return }
+        editing.insertObject(of: entity) { [weak self] object in self?.inspect(object) }
+    }
+
+    /// The inspector was showing an object only inserted, and the commit gave it a reference: it goes on
+    /// showing it, now by that reference.
+    private func followCommittedObject() {
+        guard let object = inspectedObject, object.isInserted,
+            let ref = editing.lastCommit?.insertedRefs[object]
+        else { return }
+        inspectedObject = PendingObjectID(ref)
     }
 
     /// A cell was clicked: the same row, read through another column (CNT-1).
@@ -375,7 +409,7 @@ final class ProjectContext {
 
     /// The grid is somewhere else now: remember where, and read what is selected there.
     private func arrive() {
-        inspect(navigation.current?.focus)
+        inspect(navigation.current?.focus.map(PendingObjectID.init))
         updateSelection { $0.entity = navigation.current?.entity }
     }
 
@@ -628,7 +662,7 @@ final class ProjectContext {
                 navigation.reset(to: (remembered ?? Self.firstEntity(of: model)).map { BrowseLocation(entity: $0) })
             }
             // A related object picked before the reload belongs to the session that has just gone.
-            inspect(navigation.current?.focus)
+            inspect(navigation.current?.focus.map(PendingObjectID.init))
             loadCounts(of: store.session)
             // Tracking follows the grid, so it starts again on what the grid is showing now (TRK-7).
             if resumeTracking, let location = navigation.current, model.entity(named: location.entity) != nil {

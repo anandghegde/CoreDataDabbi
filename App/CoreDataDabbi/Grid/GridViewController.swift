@@ -495,7 +495,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         // Rows carry the columns the pager was last told to read, which is the visible set.
         let read = rows.columns ?? rows.handle.columns
         guard let position = read.index(of: column.property), position < snapshot.values.count,
-            let editing = context.fieldEditing(column.property, value: snapshot.values[position], of: snapshot.ref)
+            let editing = context.fieldEditing(
+                column.property, value: snapshot.values[position], of: PendingObjectID(snapshot.ref))
         else { return false }
         editedCell?.popover.close()
         let popover = CellEditor.show(

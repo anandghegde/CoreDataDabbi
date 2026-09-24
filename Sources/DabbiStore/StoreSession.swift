@@ -305,6 +305,26 @@ public actor StoreSession {
         }
     }
 
+    /// Every stored property of one object as staged, by its own entity's layout — one that is only inserted
+    /// included, which has no reference for `object(_:)` until the commit (EDT-3). In a read-only session nothing
+    /// is staged, and this is the object as saved.
+    public func stagedObject(_ object: PendingObjectID) async throws -> StagedObject {
+        let id = try objectID(for: object)
+        let (converter, generation) = (stack.converter, generation)
+        return try await stack.perform { context in
+            let found = try Self.existingObject(id, describedAs: object, in: context)
+            // An insert that was undone leaves nothing to read.
+            if object.isInserted, !found.isInserted {
+                throw DabbiError(.objectNotFound, "\(object) no longer exists.")
+            }
+            let columns = converter.columns(for: found.entity.name ?? object.entity, includeSubentities: false)
+            guard let values = converter.values(of: found, columns: columns) else {
+                throw DabbiError(.internal, "The model does not describe \(object).")
+            }
+            return StagedObject(object: object, columns: columns, values: values, generation: generation)
+        }
+    }
+
     /// The full bytes of a binary or transformable attribute — what `BlobSummary` only summarises.
     /// `attribute` may be a path into a composite (`attachment.preview`).
     public func blob(for ref: ObjectRef, attribute: String) async throws -> Data? {
@@ -370,8 +390,24 @@ public actor StoreSession {
         return id
     }
 
+    /// A saved object by its reference, or one only inserted by the temporary identity it was staged under.
+    func objectID(for object: PendingObjectID) throws -> NSManagedObjectID {
+        if let ref = object.ref { return try objectID(for: ref) }
+        try ensureOpen()
+        guard let id = insertedObjectIDs[object.uri] else {
+            throw DabbiError(.objectNotFound, "\(object) is not staged in this session.")
+        }
+        return id
+    }
+
     static func existingObject(
         _ id: NSManagedObjectID, ref: ObjectRef, in context: NSManagedObjectContext
+    ) throws -> NSManagedObject {
+        try existingObject(id, describedAs: ref, in: context)
+    }
+
+    static func existingObject(
+        _ id: NSManagedObjectID, describedAs object: some CustomStringConvertible, in context: NSManagedObjectContext
     ) throws -> NSManagedObject {
         do {
             return try objcGuarded("The object could not be read.", code: .fetchFailed) {
@@ -380,7 +416,7 @@ public actor StoreSession {
         } catch let error as DabbiError {
             throw error
         } catch {
-            throw DabbiError(.objectNotFound, "\(ref) no longer exists.", underlying: error)
+            throw DabbiError(.objectNotFound, "\(object) no longer exists.", underlying: error)
         }
     }
 

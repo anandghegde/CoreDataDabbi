@@ -239,24 +239,24 @@ import Testing
         let inspector = InspectorModel(context: context)
 
         // Binary data and transformables have editors of their own, not a text field (EDT-3).
-        #expect(inspector.editableAttribute("dataValue", of: ref) == nil)
-        #expect(inspector.editableAttribute("keywords", of: ref) == nil)
-        let number = try #require(inspector.editableAttribute("int32Value", of: ref))
+        #expect(inspector.editableAttribute("dataValue", of: object) == nil)
+        #expect(inspector.editableAttribute("keywords", of: object) == nil)
+        let number = try #require(inspector.editableAttribute("int32Value", of: object))
 
         // What cannot be the attribute's type is explained, and nothing is staged.
-        #expect(inspector.stage("not a number", for: number, of: ref) == "This is not a whole number.")
+        #expect(inspector.stage("not a number", for: number, of: object) == "This is not a whole number.")
         await context.whenSettled()
         #expect(!context.editing.hasChanges)
 
-        #expect(inspector.stage(" 7 ", for: number, of: ref) == nil)
+        #expect(inspector.stage(" 7 ", for: number, of: object) == nil)
         await context.whenSettled()
         let field = context.editing.changes.change(for: object)?.fields.first { $0.property == "int32Value" }
         #expect(field?.after == .int(7))
         #expect(context.editing.undoManager.undoActionName == "Edit int32Value")
 
         // Nil for an attribute that must have a value is staged, and is an issue straight away (EDT-2).
-        let name = try #require(inspector.editableAttribute("name", of: ref))
-        inspector.clear(name, of: ref)
+        let name = try #require(inspector.editableAttribute("name", of: object))
+        inspector.clear(name, of: object)
         await context.whenSettled()
         #expect(context.editing.issue(for: object, property: "name")?.rule == .required)
         #expect(recorder.errors.isEmpty)
@@ -270,7 +270,69 @@ import Testing
         await context.whenSettled()
         #expect(context.accessMode == .readOnly)
         let ref = try await firstSample(context)
-        #expect(InspectorModel(context: context).editableAttribute("name", of: ref) == nil)
+        #expect(InspectorModel(context: context).editableAttribute("name", of: PendingObjectID(ref)) == nil)
+        context.select(entity: "Sample")
+        #expect(!context.canInsertObject)
+        context.shutDown()
+    }
+
+    @Test func aNewObjectIsFilledInInTheInspectorAndFollowedThroughTheCommit() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder)
+        context.select(entity: "Sample")
+        #expect(context.canInsertObject)
+        context.insertObject()
+        await context.whenSettled()
+
+        // Staged, and shown in the inspector: nowhere else has it until it is committed (EDT-3).
+        let object = try #require(context.inspectedObject)
+        #expect(object.isInserted && object.entity == "Sample")
+        #expect(context.editing.changes.change(for: object)?.kind == .inserted)
+        #expect(context.editing.undoManager.undoActionName == "New Sample")
+        #expect(context.inspectedRef == nil)
+
+        let inspector = InspectorModel(context: context)
+        inspector.refresh()
+        await inspector.whenSettled()
+        guard case .object(let shown, let staged) = inspector.details else {
+            Issue.record("the inspector did not read the new object: \(inspector.details)")
+            context.shutDown()
+            return
+        }
+        #expect(shown == object)
+        let editing = try #require(inspector.fieldEditing("name", value: staged["name"] ?? .null, of: object))
+        #expect(editing.stage("Brand new") == nil)
+        await context.whenSettled()
+        let name = context.editing.changes.change(for: object)?.fields.first { $0.property == "name" }
+        #expect(name?.after == .string("Brand new"))
+
+        // Once committed it has a reference, and the inspector goes on showing it by that.
+        #expect(await context.editing.commit().value)
+        let ref = try #require(context.inspectedRef)
+        #expect(ref.entity == "Sample")
+        inspector.refresh()
+        await inspector.whenSettled()
+        guard case .object(let committed, let saved) = inspector.details else {
+            Issue.record("the inspector lost the committed object: \(inspector.details)")
+            context.shutDown()
+            return
+        }
+        #expect(committed.ref == ref)
+        #expect(saved["name"] == .string("Brand new"))
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
+    @Test func anAbstractEntityHasNoNewObject() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder, fixture: .company)
+        context.select(entity: "Party")
+        #expect(!context.canInsertObject)
+        context.insertObject()
+        await context.whenSettled()
+        #expect(!context.editing.hasChanges)
+        context.select(entity: "Employee")
+        #expect(context.canInsertObject)
         context.shutDown()
     }
 
