@@ -93,6 +93,12 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
     }
     func windowDidEndLiveResize(_ notification: Notification) { rememberFrame() }
 
+    /// A delete still waiting on its question when the window goes would hold up every edit after it, for good:
+    /// closing answers No.
+    func windowWillClose(_ notification: Notification) {
+        if let question = deleteQuestion { window?.endSheet(question, returnCode: .cancel) }
+    }
+
     private func rememberFrame() {
         guard let window, !window.styleMask.contains(.fullScreen) else { return }
         context.updateWindow { $0.frame = window.frameDescriptor }
@@ -183,11 +189,16 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         alert.buttons[0].hasDestructiveAction = true
         guard window.attachedSheet == nil else { return alert.runModal() == .alertFirstButtonReturn }
         return await withCheckedContinuation { continuation in
-            alert.beginSheetModal(for: window) { response in
+            deleteQuestion = alert.window
+            alert.beginSheetModal(for: window) { [weak self] response in
+                self?.deleteQuestion = nil
                 continuation.resume(returning: response == .alertFirstButtonReturn)
             }
         }
     }
+
+    /// The delete confirmation on screen, while there is one.
+    private var deleteQuestion: NSWindow?
 
     /// One line per consequence: what goes with the rows, what is left pointing at nothing, what is unlinked,
     /// and what the commit would refuse.
