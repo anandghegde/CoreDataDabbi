@@ -131,6 +131,14 @@ final class EditingSession {
         }
     }
 
+    /// Links `objects` to `object` through its relationship `relationship`: added to a to-many, or set as a to-one,
+    /// replacing what it held (EDT-3).
+    func link(_ objects: [PendingObjectID], to object: PendingObjectID, through relationship: String) {
+        guard !objects.isEmpty else { return }
+        let name = String(localized: "Link \(relationship)")
+        stage { try await $0.link(objects, to: object, through: relationship, actionName: name) }
+    }
+
     /// Unlinks `objects` from `object`'s relationship `relationship`: out of a to-many, or a to-one emptied. The
     /// objects themselves stay (EDT-3).
     func unlink(_ objects: [PendingObjectID], from object: PendingObjectID, through relationship: String) {

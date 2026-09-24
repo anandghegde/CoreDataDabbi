@@ -371,6 +371,69 @@ import Testing
         context.shutDown()
     }
 
+    @Test func thePickerLinksWhatIsChosenAndLeavesWhatIsLinkedAlone() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder, fixture: .company)
+        context.select(entity: "Department")
+        let session = try #require(context.session)
+        let department = try #require(try await session.references(FetchSpec(entity: "Department"), limit: 1).first)
+        context.focus(on: department)
+        let panel = RelationshipsModel(context: context)
+        panel.refresh()
+        await panel.whenSettled()
+        panel.select("employees")
+        await panel.whenSettled()
+        let before = try #require(panel.related).items.compactMap(\.ref)
+
+        // Every employee, those of this department marked as linked already (EDT-3).
+        let picker = try #require(panel.makePicker())
+        #expect(picker.isToMany && picker.entity == "Employee")
+        picker.search()
+        await picker.whenSettled()
+        #expect(picker.items.count == picker.matching && picker.matching > before.count)
+        #expect(Set(picker.items.filter(\.isLinked).map(\.ref)) == Set(before))
+
+        // What is typed narrows it as the grid's quick filter does (PRD-6): the fixture's five managers, some of
+        // them in this department and some not. Which are is up to the keys the fixture's save handed out.
+        picker.term = "Manager"
+        await picker.whenSettled()
+        #expect(picker.matching == 5)
+        #expect(picker.items.allSatisfy { $0.label.hasPrefix("Manager ") })
+        let manager = try #require(picker.items.first { !$0.isLinked })
+
+        // What is linked already is not linked again; what is chosen is linked as one edit.
+        picker.selection = [before[0]]
+        #expect(!picker.canChoose)
+        picker.selection = [manager.ref]
+        #expect(picker.canChoose)
+        picker.choose()
+        await context.whenSettled()
+        #expect(context.editing.undoManager.undoActionName == "Link employees")
+        panel.refresh()
+        await panel.whenSettled()
+        // Listed in key order, so the manager is among the employees rather than after them.
+        #expect(Set(panel.related?.items.compactMap(\.ref) ?? []) == Set(before + [manager.ref]))
+
+        // A to-one takes one object, which replaces what it held.
+        panel.select("head")
+        await panel.whenSettled()
+        let head = try #require(panel.makePicker())
+        #expect(!head.isToMany && head.entity == "Manager")
+        head.search()
+        await head.whenSettled()
+        let chosen = try #require(head.items.first { !$0.isLinked })
+        head.selection = [chosen.ref, try #require(head.items.last).ref]
+        #expect(!head.canChoose)
+        head.selection = [chosen.ref]
+        head.choose()
+        await context.whenSettled()
+        panel.refresh()
+        await panel.whenSettled()
+        #expect(panel.related?.items.compactMap(\.ref) == [chosen.ref])
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
     @Test func anAbstractEntityHasNoNewObject() async throws {
         let recorder = Recorder()
         let (context, _) = try await editableContext(recorder, fixture: .company)
