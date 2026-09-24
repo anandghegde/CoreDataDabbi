@@ -5,6 +5,8 @@ import SwiftUI
 /// followed (REL-1, REL-2, REL-3).
 struct RelationshipsView: View {
     @Bindable var model: RelationshipsModel
+    /// The objects being offered for the followed relationship, while the picker is open (EDT-3).
+    @State private var picker: ObjectPicker?
 
     /// Below this the two lists are too narrow to read, and the relationships move into a menu instead.
     private static let twoColumnWidth: CGFloat = 380
@@ -14,6 +16,7 @@ struct RelationshipsView: View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .task(id: Trigger(model: model)) { model.refresh() }
+            .sheet(item: $picker) { ObjectPickerView(picker: $0) }
     }
 
     /// Everything a read depends on, so that SwiftUI restarts the task when any of it moves. Reading these
@@ -186,7 +189,17 @@ struct RelationshipsView: View {
                     .foregroundStyle(.secondary)
                     .help(String(localized: "The first \(RelationshipsModel.pageLimit) are listed."))
             }
-            if model.canEdit { newRelated }
+            if model.canEdit {
+                Button(
+                    model.selectedRow?.relationship.isToMany == false
+                        ? String(localized: "Choose…") : String(localized: "Link…"),
+                    systemImage: "link"
+                ) { picker = model.makePicker() }
+                .labelStyle(.iconOnly)
+                .controlSize(.small)
+                .help(String(localized: "Link objects that are already in the store"))
+                newRelated
+            }
             Button(String(localized: "Reveal"), action: model.revealSelected)
                 .disabled(!model.canReveal)
                 .controlSize(.small)

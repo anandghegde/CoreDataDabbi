@@ -291,7 +291,8 @@ final class RelationshipsModel {
     var canEdit: Bool { context.editing.isEditable && source != nil && selectedRow != nil }
 
     /// What a new related object can be: the followed to-many's destination and its sub-entities, leaving out
-    /// the abstract ones. Empty for a to-one, whose new object is made with the picker that sets it.
+    /// the abstract ones. Empty for a to-one, whose object is chosen with the picker: a to-one pointing at an
+    /// object only inserted reads as empty in the grid and the inspector until the commit.
     var insertableEntities: [String] {
         guard let relationship = selectedRow?.relationship, relationship.isToMany, let model = context.model else {
             return []
@@ -305,6 +306,24 @@ final class RelationshipsModel {
         guard canEdit, insertableEntities.contains(entity), let source, let name = selected else { return }
         context.editing.insertRelatedObject(of: entity, to: PendingObjectID(source), through: name) {
             [weak self] object in self?.context.inspect(object)
+        }
+    }
+
+    /// A picker of saved objects to link into the followed relationship: any number for a to-many, one for a
+    /// to-one, which it replaces. What the picker chooses is staged as one edit.
+    func makePicker() -> ObjectPicker? {
+        guard canEdit, let session = context.session, let model = context.model, let source, let name = selected,
+            let relationship = selectedRow?.relationship
+        else { return nil }
+        let destination = relationship.destinationEntity
+        let linked = Set(related?.items.compactMap(\.ref) ?? [])
+        let displayAttribute =
+            context.layout(of: destination).displayAttribute ?? model.entity(named: destination)?.displayAttributeName
+        return ObjectPicker(
+            entity: destination, relationship: name, isToMany: relationship.isToMany, linked: linked,
+            session: session, model: model, displayAttribute: displayAttribute
+        ) { [weak self] refs in
+            self?.context.editing.link(refs.map(PendingObjectID.init), to: PendingObjectID(source), through: name)
         }
     }
 

@@ -369,6 +369,12 @@
     "Choose an entity in the sidebar." : {
 
     },
+    "Choose “%@”" : {
+
+    },
+    "Choose…" : {
+
+    },
     "Class" : {
 
     },
@@ -711,6 +717,21 @@
     "Link" : {
 
     },
+    "Link %@" : {
+
+    },
+    "Link objects that are already in the store" : {
+
+    },
+    "Link to “%@”" : {
+
+    },
+    "Linked" : {
+
+    },
+    "Link…" : {
+
+    },
     "Load More" : {
 
     },
@@ -874,6 +895,9 @@
 
     },
     "Note:" : {
+
+    },
+    "Nothing matches" : {
 
     },
     "Nothing on the other side" : {
@@ -1296,6 +1320,16 @@
     "The first %lld are listed." : {
 
     },
+    "The first %lld of %lld are listed." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The first %1$lld of %2$lld are listed."
+          }
+        }
+      }
+    },
     "The image could not be read." : {
 
     },
@@ -1303,6 +1337,9 @@
 
     },
     "The model cached in the store" : {
+
+    },
+    "The objects could not be read." : {
 
     },
     "The relationship could not be read." : {
