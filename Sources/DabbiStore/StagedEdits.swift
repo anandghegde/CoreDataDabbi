@@ -25,7 +25,8 @@ extension StoreSession {
 
     /// Stages a new value for one attribute or to-one relationship.
     ///
-    /// For a to-one, `value` is `.toOne(ref, display:)` — the display is ignored — or `.null` to clear it.
+    /// For a to-one, `value` is `.toOne(ref, display:)`, or `.toOneInserted(object, display:)` for an object only
+    /// inserted — the display is ignored — or `.null` to clear it.
     /// To-many relationships are changed by linking and unlinking (M3-06), not by value.
     @discardableResult
     public func setValue(
@@ -54,8 +55,10 @@ extension StoreSession {
                 target.setValue(value, forKey: property)
             case .toOne(let destinationID):
                 let current = (target.value(forKey: property) as? NSManagedObject)?.objectID
-                guard current != destinationID else { return }
-                let destination = try destinationID.map { try Self.existingObject($0, object: nil, in: context) }
+                guard current != destinationID?.id else { return }
+                let destination = try destinationID.map {
+                    try Self.existingObject($0.id, object: $0.object, in: context)
+                }
                 target.setValue(destination, forKey: property)
             }
         }.1
@@ -207,7 +210,8 @@ extension StoreSession {
     /// What `setValue` stages, resolved on the actor before the edit runs.
     private enum RawValue: @unchecked Sendable {
         case attribute(Any?)
-        case toOne(NSManagedObjectID?)
+        /// The object a to-one is to lead to, and what it was called, or `nil` to empty it.
+        case toOne((id: NSManagedObjectID, object: PendingObjectID)?)
     }
 
     func entityDescription(_ name: String) throws -> EntityDescription {
@@ -226,25 +230,31 @@ extension StoreSession {
 
     private func destinationID(
         of value: Value, for relationship: RelationshipDescription, in entity: EntityDescription
-    ) throws -> NSManagedObjectID? {
+    ) throws -> (id: NSManagedObjectID, object: PendingObjectID)? {
         guard !relationship.isToMany else {
             throw DabbiError(
                 .invalidValue, "\(entity.name).\(relationship.name) is a to-many relationship.",
                 arguments: ["entity": entity.name, "property": relationship.name],
                 recovery: ["Link and unlink its objects instead of setting a value."])
         }
+        let allowed = Set(info.model.entityAndDescendants(of: relationship.destinationEntity).map(\.name))
+        func check(_ destination: String) throws {
+            guard allowed.contains(destination) else {
+                throw DabbiError(
+                    .invalidValue,
+                    "\(entity.name).\(relationship.name) leads to \(relationship.destinationEntity), not \(destination).",
+                    arguments: ["entity": entity.name, "property": relationship.name])
+            }
+        }
         switch value {
         case .null, .toOne(nil, _):
             return nil
         case .toOne(let ref?, _):
-            let allowed = Set(info.model.entityAndDescendants(of: relationship.destinationEntity).map(\.name))
-            guard allowed.contains(ref.entity) else {
-                throw DabbiError(
-                    .invalidValue,
-                    "\(entity.name).\(relationship.name) leads to \(relationship.destinationEntity), not \(ref.entity).",
-                    arguments: ["entity": entity.name, "property": relationship.name])
-            }
-            return try objectID(for: ref)
+            try check(ref.entity)
+            return (try objectID(for: ref), PendingObjectID(ref))
+        case .toOneInserted(let object, _):
+            try check(object.entity)
+            return (try objectID(for: object), object)
         default:
             throw DabbiError(
                 .invalidValue, "\(entity.name).\(relationship.name) is a relationship; give it an object.",
@@ -252,11 +262,14 @@ extension StoreSession {
         }
     }
 
-    /// A staged edit's object, refused when it is gone or staged for deletion.
+    /// A staged edit's object, refused when it is gone or staged for deletion, or, for one only inserted, when
+    /// the insert was undone.
     static func existingObject(
         _ id: NSManagedObjectID, object: PendingObjectID?, in context: NSManagedObjectContext
     ) throws -> NSManagedObject {
-        guard let found = try? context.existingObject(with: id), !found.isDeleted else {
+        guard let found = try? context.existingObject(with: id), !found.isDeleted,
+            object?.isInserted != true || found.isInserted
+        else {
             throw DabbiError(.objectNotFound, "\(object?.description ?? "The object") no longer exists.")
         }
         return found

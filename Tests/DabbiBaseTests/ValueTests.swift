@@ -4,6 +4,8 @@ import Testing
 
 @Suite struct ValueTests {
     private let ref = ObjectRef(entity: "Tag", pk: 7, uri: URL(string: "x-coredata://S/Tag/p7")!)
+    /// A tag only inserted: its URI is the temporary one Core Data gives an object before it is saved.
+    private let staged = PendingObjectID(uri: URL(string: "x-coredata:///Tag/t1A2B")!, entity: "Tag")
 
     @Test func displayStrings() {
         #expect(Value.null.displayString() == "nil")
@@ -17,6 +19,8 @@ import Testing
         #expect(Value.toOne(ref, display: nil).displayString() == "Tag#7")
         #expect(Value.toOne(ref, display: "urgent").displayString() == "urgent")
         #expect(Value.toOne(nil, display: nil).displayString() == "nil")
+        #expect(Value.toOneInserted(staged, display: nil).displayString() == "Tag#new")
+        #expect(Value.toOneInserted(staged, display: "draft").displayString() == "draft")
         #expect(
             Value.blob(BlobSummary(byteCount: 12, sniffedType: .png, isExternal: false)).displayString()
                 == "<12 bytes png>")
@@ -42,6 +46,12 @@ import Testing
         #expect(json.contains(#""many":{"$count":4}"#))
         #expect(json.contains(#""blob":{"$blob":{"byteCount":9,"external":true}}"#))
         #expect(json.contains(#""composite":{"x":false}"#))
+
+        // An object only inserted has no reference to hand out: its temporary URI is not a `$ref`.
+        let inserted = try #require(Value.toOneInserted(staged, display: "draft").jsonObject() as? [String: Any])
+        #expect(inserted["$inserted"] as? String == "x-coredata:///Tag/t1A2B")
+        #expect(inserted["$entity"] as? String == "Tag" && inserted["display"] as? String == "draft")
+        #expect(inserted["$ref"] == nil)
     }
 
     @Test func codableRoundTrip() throws {
@@ -50,6 +60,7 @@ import Testing
             .date(Date(timeIntervalSinceReferenceDate: 1)), .uuid(UUID()), .url(URL(string: "https://example.org")!),
             .blob(BlobSummary(byteCount: 1, sniffedType: .json, isExternal: false)),
             .composite(["a": .composite(["b": .int(1)])]), .toOne(ref, display: "x"), .toMany(count: 0),
+            .toOneInserted(staged, display: nil),
         ]
         let decoded = try JSONDecoder().decode([Value].self, from: JSONEncoder().encode(values))
         #expect(decoded == values)

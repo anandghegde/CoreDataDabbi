@@ -68,6 +68,19 @@ import Testing
         #expect(render(.toMany(count: 3)).emphasis == .reference)
     }
 
+    @Test func saysThatAnInsertedObjectIsNotInTheStoreYet() throws {
+        let staged = PendingObjectID(uri: URL(string: "x-coredata:///Person/tX")!, entity: "Person")
+        let unnamed = render(.toOneInserted(staged, display: nil))
+        #expect(unnamed.text == "New Person")
+        #expect(unnamed.emphasis == .reference)
+        #expect(try #require(unnamed.tooltip).contains("not in the store"))
+        #expect(unnamed.accessibleText == "New Person, not committed yet")
+
+        let named = render(.toOneInserted(staged, display: "Ada"))
+        #expect(named.text == "Ada")
+        #expect(named.accessibleText == "Ada, not committed yet")
+    }
+
     @Test func groupsLargeNumbers() {
         #expect(render(.int(1_234_567)).text == "1,234,567")
     }

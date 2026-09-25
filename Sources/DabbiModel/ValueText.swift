@@ -37,7 +37,7 @@ public enum ValueText {
         case .date(let date): Self.dateText(date, timeZone: timeZone)
         case .uuid(let uuid): uuid.uuidString
         case .url(let url): url.absoluteString
-        case .blob, .composite, .toOne, .toMany: value.displayString(timeZone: timeZone)
+        case .blob, .composite, .toOne, .toOneInserted, .toMany: value.displayString(timeZone: timeZone)
         }
     }
 

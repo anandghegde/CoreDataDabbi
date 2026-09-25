@@ -127,12 +127,15 @@ struct ValueConverter: Sendable {
     }
 
     func toOne(_ raw: Any?) -> Value {
-        guard let destination = raw as? NSManagedObject,
-            let ref = ObjectRef(uri: destination.objectID.uriRepresentation())
-        else { return .toOne(nil, display: nil) }
+        guard let destination = raw as? NSManagedObject else { return .toOne(nil, display: nil) }
         let display = destination.entity.name.flatMap { layouts[$0]?.displayAttribute }
             .flatMap { destination.value(forKey: $0) as? String }
-        return .toOne(ref, display: display.flatMap { $0.isEmpty ? nil : $0 })
+            .flatMap { $0.isEmpty ? nil : $0 }
+        // One only inserted has no reference until the commit, and is named by the identity it was staged under.
+        guard let ref = ObjectRef(uri: destination.objectID.uriRepresentation()) else {
+            return .toOneInserted(pendingID(of: destination), display: display)
+        }
+        return .toOne(ref, display: display)
     }
 
     func toMany(_ raw: Any?) -> Value {

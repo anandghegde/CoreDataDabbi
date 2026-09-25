@@ -180,6 +180,8 @@ final class RelationshipsModel {
                 Row(relationship: relationship, count: count)
             case .toOne(let destination, let display):
                 Row(relationship: relationship, count: destination == nil ? 0 : 1, display: display)
+            case .toOneInserted(_, let display):
+                Row(relationship: relationship, count: 1, display: display)
             default:
                 Row(relationship: relationship, count: 0)
             }
@@ -290,13 +292,10 @@ final class RelationshipsModel {
     /// Whether the relationship being followed can be changed from here: the store is open for editing.
     var canEdit: Bool { context.editing.isEditable && source != nil && selectedRow != nil }
 
-    /// What a new related object can be: the followed to-many's destination and its sub-entities, leaving out
-    /// the abstract ones. Empty for a to-one, whose object is chosen with the picker: a to-one pointing at an
-    /// object only inserted reads as empty in the grid and the inspector until the commit.
+    /// What a new related object can be: the followed relationship's destination and its sub-entities, leaving
+    /// out the abstract ones. For a to-one, the new object replaces what it held.
     var insertableEntities: [String] {
-        guard let relationship = selectedRow?.relationship, relationship.isToMany, let model = context.model else {
-            return []
-        }
+        guard let relationship = selectedRow?.relationship, let model = context.model else { return [] }
         return model.entityAndDescendants(of: relationship.destinationEntity).filter { !$0.isAbstract }.map(\.name)
     }
 
