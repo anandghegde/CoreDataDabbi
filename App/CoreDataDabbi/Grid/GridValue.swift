@@ -105,6 +105,14 @@ struct GridValue: Equatable {
             }
             return GridValue(text: display ?? ref.description, emphasis: .reference, tooltip: ref.description)
 
+        case .toOneInserted(let object, let display):
+            // Only inserted: no object ID to show yet, and nothing in the store to point at until the commit.
+            let label = display ?? String(localized: "New \(object.entity)")
+            return GridValue(
+                text: label, emphasis: .reference,
+                tooltip: String(localized: "\(object.entity), not in the store until it is committed"),
+                spoken: String(localized: "\(label), not committed yet"))
+
         case .toMany(let count):
             guard count > 0 else {
                 return GridValue(

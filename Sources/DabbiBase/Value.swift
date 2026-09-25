@@ -24,6 +24,10 @@ public enum Value: Sendable, Hashable, Codable {
     case composite([String: Value])
     /// A to-one relationship: the destination and a human-friendly label for it.
     case toOne(ObjectRef?, display: String?)
+    /// A to-one relationship whose destination is only inserted — staged in an editable session, not committed —
+    /// named by the identity it was staged under, and a label for it. It has no reference until the commit
+    /// gives it one, and reads as `.toOne` from then on (EDT-3).
+    case toOneInserted(PendingObjectID, display: String?)
     /// A to-many relationship, summarised by its count.
     case toMany(count: Int)
 
@@ -74,6 +78,7 @@ extension Value {
         case .toOne(let ref, let display):
             guard let ref else { return "nil" }
             return display ?? ref.description
+        case .toOneInserted(let object, let display): return display ?? object.description
         case .toMany(let count): return "\(count) object\(count == 1 ? "" : "s")"
         }
     }

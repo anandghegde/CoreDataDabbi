@@ -150,6 +150,66 @@ import Testing
         await session.close()
     }
 
+    @Test func aToOneLeadsToANewObjectByItsStagedIdentityUntilTheCommit() async throws {
+        let (session, location) = try await open(.company)
+        let department = try #require(try await refs(session, "Department").first)
+        let object = PendingObjectID(department)
+        let saved = try #require(try await session.object(department)["head"])
+
+        // Made at the far end of a to-one, the new object replaces what it held, and the department leads to it
+        // by the identity it was staged under: it has no reference yet. Its name is empty, so it has no label.
+        let (manager, changes) = try await session.insertRelatedObject(to: object, through: "head")
+        #expect(manager.isInserted && manager.entity == "Manager")
+        #expect(changes.undoActionName == "New Manager" && changes.undoDepth == 1)
+        #expect(try await session.object(department)["head"] == .toOneInserted(manager, display: nil))
+        #expect(try await linked(session, department, "head") == [manager])
+
+        // As a value, it is set and checked like a saved object.
+        try await session.setValue(saved, for: "head", of: object)
+        #expect(try await session.object(department)["head"] == saved)
+        try await session.setValue(.toOneInserted(manager, display: "ignored"), for: "head", of: object)
+        #expect(try await session.object(department)["head"] == .toOneInserted(manager, display: nil))
+        let (tag, _) = try await session.insertObject(entity: "Tag")
+        let wrongEntity = await #expect(throws: DabbiError.self) {
+            try await session.setValue(.toOneInserted(tag, display: nil), for: "head", of: object)
+        }
+        #expect(wrongEntity?.code == .invalidValue)
+        // What an identity resolves to is checked, not only the entity it names.
+        let disguised = PendingObjectID(uri: tag.uri, entity: "Manager")
+        let posing = await #expect(throws: DabbiError.self) {
+            try await session.setValue(.toOneInserted(disguised, display: nil), for: "head", of: object)
+        }
+        #expect(posing?.code == .invalidValue)
+        let linkedPosing = await #expect(throws: DabbiError.self) {
+            try await session.link([disguised], to: object, through: "head")
+        }
+        #expect(linkedPosing?.code == .invalidValue)
+        let savedTag = try #require(try await refs(session, "Tag").first)
+        let posingRef = ObjectRef(entity: "Manager", pk: savedTag.pk, uri: savedTag.uri)
+        let savedPosing = await #expect(throws: DabbiError.self) {
+            try await session.setValue(.toOne(posingRef, display: nil), for: "head", of: object)
+        }
+        #expect(savedPosing?.code == .invalidValue)
+        // One whose insert was undone is no longer there to lead to.
+        let (undone, _) = try await session.insertObject(entity: "Manager")
+        try await session.undo()
+        let gone = await #expect(throws: DabbiError.self) {
+            try await session.setValue(.toOneInserted(undone, display: nil), for: "head", of: object)
+        }
+        #expect(gone?.code == .objectNotFound)
+        #expect(try await session.object(department)["head"] == .toOneInserted(manager, display: nil))
+
+        // The commit gives it a reference, and the department leads to it by that from then on.
+        let summary = try await session.commit()
+        let committed = try #require(summary.insertedRefs[manager])
+        #expect(committed.entity == "Manager")
+        #expect(try await session.object(department)["head"] == .toOne(committed, display: nil))
+        await session.close()
+        let reader = try await StoreSession.open(storeURL: location.storeURL, modelURL: location.modelURL)
+        #expect(try await reader.object(department)["head"] == .toOne(committed, display: nil))
+        await reader.close()
+    }
+
     @Test func whatARelationshipCannotHoldIsRefusedBeforeAnythingIsStaged() async throws {
         let (session, _) = try await open(.company)
         let department = PendingObjectID(try #require(try await refs(session, "Department").first))

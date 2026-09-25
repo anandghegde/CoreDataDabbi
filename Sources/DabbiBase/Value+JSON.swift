@@ -45,6 +45,11 @@ extension Value {
             var object: [String: Any] = ["$ref": ref.uri.absoluteString]
             if let display { object["display"] = display }
             return object
+        case .toOneInserted(let inserted, let display):
+            // Not a `$ref`: the temporary URI names nothing outside the session that staged it.
+            var object: [String: Any] = ["$inserted": inserted.uri.absoluteString, "$entity": inserted.entity]
+            if let display { object["display"] = display }
+            return object
         case .toMany(let count):
             return ["$count": count]
         }

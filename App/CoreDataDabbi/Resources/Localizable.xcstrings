@@ -125,6 +125,12 @@
         }
       }
     },
+    "%@, not committed yet" : {
+
+    },
+    "%@, not in the store until it is committed" : {
+
+    },
     "%@, not where it was" : {
 
     },

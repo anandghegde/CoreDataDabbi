@@ -363,10 +363,22 @@ import Testing
         await panel.whenSettled()
         #expect(panel.related?.items.map(\.object) == before)
 
-        // A to-one's object is chosen with the picker, not made here.
+        // A to-one's new object replaces what it held, and the department reads as pointing at it before the
+        // commit gives it an identity.
         panel.select("head")
         await panel.whenSettled()
-        #expect(panel.insertableEntities.isEmpty)
+        #expect(panel.insertableEntities == ["Manager"])
+        panel.insertRelated("Manager")
+        await context.whenSettled()
+        let head = try #require(context.inspectedObject)
+        #expect(head.isInserted && head.entity == "Manager")
+        panel.refresh()
+        await panel.whenSettled()
+        // Named even without a label of its own.
+        #expect(panel.selectedRow?.count == 1 && panel.selectedRow?.display == "New Manager")
+        #expect(panel.related?.items.map(\.object) == [head])
+        let staged = try await session.stagedObject(PendingObjectID(department))
+        #expect(staged["head"] == .toOneInserted(head, display: nil))
         #expect(recorder.errors.isEmpty)
         context.shutDown()
     }
