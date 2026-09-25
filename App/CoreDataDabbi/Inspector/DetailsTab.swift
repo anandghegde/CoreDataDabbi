@@ -3,8 +3,8 @@ import SwiftUI
 
 /// Every stored property of the selected object, in one column (BRW-7).
 ///
-/// When the store is open for editing, attribute values are edited in place (EDT-3): unlocking a store changes
-/// what the rows do and not where anything is.
+/// When the store is open for editing, attribute values are edited in place and a to-one's object is chosen
+/// from the row (EDT-3): unlocking a store changes what the rows do and not where anything is.
 struct DetailsTab: View {
     let model: InspectorModel
 
@@ -54,7 +54,8 @@ struct DetailsTab: View {
                         name: property.name, type: property.type,
                         rendered: GridValue.render(property.value, timeZone: model.timeZone),
                         issue: issues.first { $0.property == property.name },
-                        editing: model.fieldEditing(property.name, value: property.value, of: object))
+                        editing: model.fieldEditing(property.name, value: property.value, of: object),
+                        choosing: model.toOneChoosing(property.name, value: property.value, of: object))
                 }
             }
             .padding(.vertical, 10)

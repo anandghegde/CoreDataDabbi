@@ -446,6 +446,59 @@ import Testing
         context.shutDown()
     }
 
+    @Test func theInspectorChoosesAToOneWithThePickerAndEmptiesIt() async throws {
+        let recorder = Recorder()
+        let (context, _) = try await editableContext(recorder, fixture: .company)
+        let session = try #require(context.session)
+        let department = PendingObjectID(
+            try #require(try await session.references(FetchSpec(entity: "Department"), limit: 1).first))
+        let inspector = InspectorModel(context: context)
+        let value = try #require(try await session.stagedObject(department)["head"])
+        guard case .toOne(let head?, _) = value else {
+            Issue.record("the department has no head: \(value)")
+            context.shutDown()
+            return
+        }
+
+        // Attributes are typed and to-manys are linked in the relationships panel; a to-one is chosen (EDT-3).
+        #expect(inspector.toOneChoosing("name", value: .string("Sales"), of: department) == nil)
+        #expect(inspector.toOneChoosing("employees", value: .toMany(count: 3), of: department) == nil)
+        #expect(inspector.fieldEditing("head", value: value, of: department) == nil)
+        let choosing = try #require(inspector.toOneChoosing("head", value: value, of: department))
+        #expect(choosing.clear != nil)
+
+        // The picker lists the managers with the one it leads to marked, and what is chosen replaces it as an
+        // edit of the field.
+        let picker = try #require(choosing.pick())
+        #expect(!picker.isToMany && picker.entity == "Manager" && picker.relationship == "head")
+        picker.search()
+        await picker.whenSettled()
+        #expect(picker.matching == 5)
+        #expect(picker.items.filter(\.isLinked).map(\.ref) == [head])
+        let other = try #require(picker.items.first { !$0.isLinked })
+        picker.selection = [other.ref]
+        picker.choose()
+        await context.whenSettled()
+        #expect(context.editing.undoManager.undoActionName == "Edit head")
+        let chosen = try #require(try await session.stagedObject(department)["head"])
+        guard case .toOne(let ref?, _) = chosen else {
+            Issue.record("nothing was chosen: \(chosen)")
+            context.shutDown()
+            return
+        }
+        #expect(ref == other.ref)
+
+        // Set to Nil empties it; an empty to-one has nothing left to empty.
+        let clear = try #require(inspector.toOneChoosing("head", value: chosen, of: department)?.clear)
+        clear()
+        await context.whenSettled()
+        let emptied = try #require(try await session.stagedObject(department)["head"])
+        #expect(emptied == .toOne(nil, display: nil))
+        #expect(inspector.toOneChoosing("head", value: emptied, of: department)?.clear == nil)
+        #expect(recorder.errors.isEmpty)
+        context.shutDown()
+    }
+
     @Test func anAbstractEntityHasNoNewObject() async throws {
         let recorder = Recorder()
         let (context, _) = try await editableContext(recorder, fixture: .company)

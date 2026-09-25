@@ -312,17 +312,11 @@ final class RelationshipsModel {
     /// A picker of saved objects to link into the followed relationship: any number for a to-many, one for a
     /// to-one, which it replaces. What the picker chooses is staged as one edit.
     func makePicker() -> ObjectPicker? {
-        guard canEdit, let session = context.session, let model = context.model, let source, let name = selected,
-            let relationship = selectedRow?.relationship
-        else { return nil }
-        let destination = relationship.destinationEntity
+        guard canEdit, let source, let name = selected, let relationship = selectedRow?.relationship else {
+            return nil
+        }
         let linked = Set(related?.items.compactMap(\.ref) ?? [])
-        let displayAttribute =
-            context.layout(of: destination).displayAttribute ?? model.entity(named: destination)?.displayAttributeName
-        return ObjectPicker(
-            entity: destination, relationship: name, isToMany: relationship.isToMany, linked: linked,
-            session: session, model: model, displayAttribute: displayAttribute
-        ) { [weak self] refs in
+        return context.objectPicker(for: relationship, linked: linked) { [weak self] refs in
             self?.context.editing.link(refs.map(PendingObjectID.init), to: PendingObjectID(source), through: name)
         }
     }
