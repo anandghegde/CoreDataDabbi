@@ -2,8 +2,9 @@ import DabbiKit
 import Foundation
 
 /// How a value is edited where it is shown (EDT-3): what can be typed into, what the typing becomes, and how it
-/// is staged. The inspector's fields and the grid's cells both ask here, so that the rules are the same wherever
-/// a value is edited.
+/// is staged; and which object a to-one leads to, which is picked rather than typed. The inspector's fields, the
+/// grid's cells and the relationships panel all ask here, so that the rules are the same wherever a value is
+/// edited.
 extension ProjectContext {
     /// The attribute `name` of `object`'s own entity, when the store is open for editing and the attribute is one
     /// a person can type: stored, not derived, and of a type `ValueText` reads.
@@ -45,5 +46,59 @@ extension ProjectContext {
         return FieldEditing(
             text: ValueText.text(for: value, timeZone: timeZone),
             stage: { [weak self] in self?.stage($0, for: attribute, of: object) }, clear: clear)
+    }
+
+    // MARK: To-ones
+
+    /// The to-one relationship `name` of `object`'s own entity, when the store is open for editing: stored, and
+    /// changed by choosing the object it leads to.
+    func editableToOne(_ name: String, of object: PendingObjectID) -> RelationshipDescription? {
+        guard accessMode == .editable,
+            let relationship = model?.entity(named: object.entity)?.relationship(named: name),
+            !relationship.isToMany, !relationship.isTransient
+        else { return nil }
+        return relationship
+    }
+
+    /// A picker of the saved objects `relationship` can lead to — its destination's and the sub-entities' —
+    /// labelled by the display attribute, the project's choice before the model's. Those in `linked` are marked
+    /// and not offered again; what is chosen goes to `choose`.
+    func objectPicker(
+        for relationship: RelationshipDescription, linked: Set<ObjectRef>,
+        choose: @escaping @MainActor ([ObjectRef]) -> Void
+    ) -> ObjectPicker? {
+        guard accessMode == .editable, let session, let model else { return nil }
+        let destination = relationship.destinationEntity
+        let displayAttribute =
+            layout(of: destination).displayAttribute ?? model.entity(named: destination)?.displayAttributeName
+        return ObjectPicker(
+            entity: destination, relationship: relationship.name, isToMany: relationship.isToMany, linked: linked,
+            session: session, model: model, displayAttribute: displayAttribute, onChoose: choose)
+    }
+
+    /// How the to-one `name` of `object`, which holds `value` now, is changed — `nil` when it cannot be. The
+    /// object chosen replaces the one it leads to, as an edit of the field.
+    func toOneChoosing(_ name: String, value: Value, of object: PendingObjectID) -> ToOneChoosing? {
+        guard let relationship = editableToOne(name, of: object) else { return nil }
+        // The saved object it leads to is marked in the picker; one only inserted is not listed there at all.
+        let (linked, leadsSomewhere): (Set<ObjectRef>, Bool) =
+            switch value {
+            case .toOne(let ref?, _): ([ref], true)
+            case .toOneInserted: ([], true)
+            default: ([], false)
+            }
+        var clear: (@MainActor () -> Void)?
+        if relationship.isOptional, leadsSomewhere {
+            clear = { [weak self] in self?.editing.setValue(.null, for: name, of: object) }
+        }
+        return ToOneChoosing(
+            pick: { [weak self] in
+                guard let self else { return nil }
+                return self.objectPicker(for: relationship, linked: linked) { [weak self] refs in
+                    guard let ref = refs.first else { return }
+                    self?.editing.setValue(.toOne(ref, display: nil), for: name, of: object)
+                }
+            },
+            clear: clear)
     }
 }

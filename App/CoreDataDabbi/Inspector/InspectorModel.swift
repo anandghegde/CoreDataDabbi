@@ -118,6 +118,11 @@ final class InspectorModel {
         context.fieldEditing(name, value: value, of: object)
     }
 
+    /// How the to-one `name` of `object`, which holds `value` now, is chosen — `nil` when it cannot be.
+    func toOneChoosing(_ name: String, value: Value, of object: PendingObjectID) -> ToOneChoosing? {
+        context.toOneChoosing(name, value: value, of: object)
+    }
+
     /// Reads whatever the current tab needs. Called from the view's `task`, so that a tab nobody looks at costs
     /// nothing — the Structure tab in particular runs four `PRAGMA`s the Details tab has no use for.
     func refresh() {

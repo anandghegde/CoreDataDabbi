@@ -11,19 +11,30 @@ struct FieldEditing {
     let clear: (@MainActor () -> Void)?
 }
 
+/// How a to-one field is changed, when it can be (EDT-3): by picking the object it leads to, not by typing.
+struct ToOneChoosing {
+    /// A picker of the saved objects the to-one can lead to, the one it leads to now marked; `nil` once the store
+    /// is no longer open for editing.
+    let pick: @MainActor () -> ObjectPicker?
+    /// Empties the to-one; `nil` when it has to lead somewhere, or leads nowhere already.
+    let clear: (@MainActor () -> Void)?
+}
+
 /// One field of the Details tab: its name and type, its value, and the rule of the model its staged value breaks
 /// (EDT-2).
 ///
 /// When the store is open for editing the value is edited in place (EDT-3). The pencil, *Edit Value* in the
 /// context menu or VoiceOver's action open a text field; Return stages what was typed, Escape leaves the value
 /// as it was, and leaving the field stages it too. Text that cannot be a value of the attribute's type stays in
-/// the field, with the reason under it.
+/// the field, with the reason under it. A to-one's object is chosen instead: the link button, *Choose Object…*
+/// or VoiceOver's action open the object picker, and what is chosen replaces what it led to.
 struct FieldRow: View {
     let name: String
     let type: String?
     let rendered: GridValue
     let issue: ValidationIssue?
     let editing: FieldEditing?
+    let choosing: ToOneChoosing?
 
     /// Whether the value is being typed rather than only shown.
     @State private var isEditing = false
@@ -32,6 +43,8 @@ struct FieldRow: View {
     /// Why `draft` cannot be staged.
     @State private var problem: String?
     @FocusState private var isFocused: Bool
+    /// The picker a to-one's object is being chosen with.
+    @State private var picker: ObjectPicker?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -50,6 +63,14 @@ struct FieldRow: View {
                     }
                     .buttonStyle(.borderless)
                     .help(String(localized: "Edit Value"))
+                    .accessibilityHidden(true)
+                } else if choosing != nil {
+                    Spacer(minLength: 4)
+                    Button(action: choose) {
+                        Image(systemName: "link")
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: "Choose Object…"))
                     .accessibilityHidden(true)
                 }
             }
@@ -73,14 +94,22 @@ struct FieldRow: View {
                 if let clear = editing.clear {
                     Button(String(localized: "Set to Nil")) { clear() }
                 }
+            } else if let choosing {
+                Button(String(localized: "Choose Object…"), action: choose)
+                if let clear = choosing.clear {
+                    Button(String(localized: "Set to Nil")) { clear() }
+                }
             }
         }
+        .sheet(item: $picker) { ObjectPickerView(picker: $0) }
         // Read as one line while it is shown; while it is edited, the text field has to be reachable on its own.
         .accessibilityElement(children: isEditing ? .contain : .combine)
         .accessibilityLabel(DetailsTab.spoken(name, rendered.text, issue: issue))
         .accessibilityActions {
             if editing != nil, !isEditing {
                 Button(String(localized: "Edit Value"), action: begin)
+            } else if choosing != nil {
+                Button(String(localized: "Choose Object…"), action: choose)
             }
         }
     }
@@ -149,5 +178,10 @@ struct FieldRow: View {
     private func cancel() {
         isEditing = false
         problem = nil
+    }
+
+    /// Opens the picker a to-one's object is chosen with.
+    private func choose() {
+        picker = choosing?.pick()
     }
 }
