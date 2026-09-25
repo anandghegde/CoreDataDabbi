@@ -374,7 +374,8 @@ import Testing
         #expect(head.isInserted && head.entity == "Manager")
         panel.refresh()
         await panel.whenSettled()
-        #expect(panel.selectedRow?.count == 1)
+        // Named even without a label of its own.
+        #expect(panel.selectedRow?.count == 1 && panel.selectedRow?.display == "New Manager")
         #expect(panel.related?.items.map(\.object) == [head])
         let staged = try await session.stagedObject(PendingObjectID(department))
         #expect(staged["head"] == .toOneInserted(head, display: nil))

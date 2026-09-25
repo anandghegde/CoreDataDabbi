@@ -222,10 +222,24 @@ extension StoreSession {
         return entity
     }
 
+    /// `object`'s ID in a session open for editing, checked as `resolvedObjectID(for:)` checks it.
     func editableObjectID(for object: PendingObjectID) throws -> NSManagedObjectID {
         try ensureOpen()
         guard stack.isEditable else { throw CoreDataStack.notEditable }
-        return try objectID(for: object)
+        return try resolvedObjectID(for: object)
+    }
+
+    /// `object`'s ID, refused when it resolves to an object of another entity than the one `object` names. An
+    /// edit is checked against the entity named, and Core Data raises on a value of the wrong one.
+    func resolvedObjectID(for object: PendingObjectID) throws -> NSManagedObjectID {
+        let id = try objectID(for: object)
+        let actual = id.entity.name
+        guard actual == object.entity else {
+            throw DabbiError(
+                .invalidValue, "The object given as a \(object.entity) is a \(actual ?? "different entity").",
+                arguments: ["entity": object.entity])
+        }
+        return id
     }
 
     private func destinationID(
@@ -251,10 +265,10 @@ extension StoreSession {
             return nil
         case .toOne(let ref?, _):
             try check(ref.entity)
-            return (try objectID(for: ref), PendingObjectID(ref))
+            return (try resolvedObjectID(for: PendingObjectID(ref)), PendingObjectID(ref))
         case .toOneInserted(let object, _):
             try check(object.entity)
-            return (try objectID(for: object), object)
+            return (try resolvedObjectID(for: object), object)
         default:
             throw DabbiError(
                 .invalidValue, "\(entity.name).\(relationship.name) is a relationship; give it an object.",

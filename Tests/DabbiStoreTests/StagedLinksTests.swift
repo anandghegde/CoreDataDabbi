@@ -174,6 +174,22 @@ import Testing
             try await session.setValue(.toOneInserted(tag, display: nil), for: "head", of: object)
         }
         #expect(wrongEntity?.code == .invalidValue)
+        // What an identity resolves to is checked, not only the entity it names.
+        let disguised = PendingObjectID(uri: tag.uri, entity: "Manager")
+        let posing = await #expect(throws: DabbiError.self) {
+            try await session.setValue(.toOneInserted(disguised, display: nil), for: "head", of: object)
+        }
+        #expect(posing?.code == .invalidValue)
+        let linkedPosing = await #expect(throws: DabbiError.self) {
+            try await session.link([disguised], to: object, through: "head")
+        }
+        #expect(linkedPosing?.code == .invalidValue)
+        let savedTag = try #require(try await refs(session, "Tag").first)
+        let posingRef = ObjectRef(entity: "Manager", pk: savedTag.pk, uri: savedTag.uri)
+        let savedPosing = await #expect(throws: DabbiError.self) {
+            try await session.setValue(.toOne(posingRef, display: nil), for: "head", of: object)
+        }
+        #expect(savedPosing?.code == .invalidValue)
         // One whose insert was undone is no longer there to lead to.
         let (undone, _) = try await session.insertObject(entity: "Manager")
         try await session.undo()

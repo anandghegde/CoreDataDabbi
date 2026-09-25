@@ -180,8 +180,9 @@ final class RelationshipsModel {
                 Row(relationship: relationship, count: count)
             case .toOne(let destination, let display):
                 Row(relationship: relationship, count: destination == nil ? 0 : 1, display: display)
-            case .toOneInserted(_, let display):
-                Row(relationship: relationship, count: 1, display: display)
+            case .toOneInserted(let object, let display):
+                // Named even without a label, so that the list does not show it as nothing.
+                Row(relationship: relationship, count: 1, display: display ?? String(localized: "New \(object.entity)"))
             default:
                 Row(relationship: relationship, count: 0)
             }
