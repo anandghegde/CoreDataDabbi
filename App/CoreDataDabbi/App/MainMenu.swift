@@ -187,6 +187,12 @@ enum MainMenu {
             item(
                 String(localized: "Open in Separate Window"),
                 #selector(ProjectWindowController.openObjectWindows(_:)), "o", [.command, .option]))
+        // One change to one attribute of many rows, previewed first (EDT-4).
+        menu.addItem(item(String(localized: "Batch Update…"), #selector(ProjectWindowController.batchUpdate(_:))))
+        menu.addItem(
+            item(String(localized: "Find and Replace…"), #selector(ProjectWindowController.findAndReplace(_:))))
+        menu.addItem(
+            item(String(localized: "Nullify Attributes…"), #selector(ProjectWindowController.nullifyAttributes(_:))))
         menu.addItem(
             item(
                 String(localized: "Show Pending Changes"), #selector(ProjectWindowController.togglePendingChanges(_:)),

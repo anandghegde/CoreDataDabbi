@@ -34,6 +34,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     private var shownInserted = 0
     /// What the pager was opened with, to open it again when objects are inserted or their inserts undone.
     private var shownSpec: FetchSpec?
+    /// The fetch whose rows the grid shows, its limit included: what a batch edit of all rows changes (EDT-4).
+    var shownFetch: FetchSpec? { shownSpec }
     /// Opens an object in a window of its own (BRW-9): a double-click on a cell there is nothing to edit in.
     var onOpenObject: ((PendingObjectID) -> Void)?
     /// Bumped per open; a pager that arrives after another open started is dropped.

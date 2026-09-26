@@ -603,12 +603,12 @@ public actor StoreSession {
     }
 
     /// `NSFetchRequest` is not `Sendable`; this one is built here and only ever used inside one `perform`.
-    private struct Request<Result: NSFetchRequestResult>: @unchecked Sendable {
+    struct Request<Result: NSFetchRequestResult>: @unchecked Sendable {
         let value: NSFetchRequest<Result>
     }
 
     /// - Parameter window: the rows of the result to fetch, instead of the spec's limit.
-    private func fetchRequest<Result: NSFetchRequestResult>(
+    func fetchRequest<Result: NSFetchRequestResult>(
         for spec: FetchSpec, resultType: Result.Type, window: (offset: Int, limit: Int)? = nil
     ) throws -> Request<Result> {
         try ensureOpen()

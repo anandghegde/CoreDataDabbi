@@ -124,6 +124,20 @@ final class InspectorModel {
         context.fieldEditing(name, value: value, of: object)
     }
 
+    /// A binary field's file commands (EDT-6); `nil` for any other property.
+    func binaryEditing(_ name: String, value: Value, of object: PendingObjectID) -> BinaryEditing? {
+        context.binaryEditing(name, value: value, of: object)
+    }
+
+    /// A composite's elements as fields (EDT-7); empty for any other property.
+    func compositeFields(_ name: String, value: Value, of object: PendingObjectID) -> [CompositeField] {
+        context.compositeFields(name, value: value, of: object)
+    }
+
+    func fieldEditing(_ field: CompositeField, of object: PendingObjectID) -> FieldEditing? {
+        context.fieldEditing(field, of: object)
+    }
+
     /// How the to-one `name` of `object`, which holds `value` now, is chosen — `nil` when it cannot be.
     func toOneChoosing(_ name: String, value: Value, of object: PendingObjectID) -> ToOneChoosing? {
         context.toOneChoosing(name, value: value, of: object)

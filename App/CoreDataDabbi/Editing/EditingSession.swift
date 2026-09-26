@@ -120,6 +120,53 @@ final class EditingSession {
         }
     }
 
+    /// Stages one change to `attribute` of many objects, as one edit (EDT-4), and hands `done` how many changed.
+    func batchEdit(
+        _ operation: BatchOperation, attribute: String, entity: String, target: BatchTarget,
+        done: (@MainActor (Int) -> Void)? = nil
+    ) {
+        let name: String =
+            switch operation {
+            case .set: String(localized: "Batch Update \(attribute)")
+            case .replace: String(localized: "Replace in \(attribute)")
+            case .nullify: String(localized: "Nullify \(attribute)")
+            }
+        stage { session in
+            let (changed, changes) = try await session.batchEdit(
+                operation, attribute: attribute, entity: entity, target: target, actionName: name)
+            done?(changed)
+            return changes
+        }
+    }
+
+    /// What `batchEdit` would do, read without staging anything. Queued behind the edits sent before it, so that
+    /// it sees them.
+    func batchPreview(
+        _ operation: BatchOperation, attribute: String, entity: String, target: BatchTarget
+    ) async throws -> BatchPreview {
+        guard let session else { throw DabbiError(.notEditable, "The store is not open for editing.") }
+        await control?.value
+        return try await session.batchPreview(operation, attribute: attribute, entity: entity, target: target)
+    }
+
+    /// Stages the contents of the file at `url` as the bytes of `attribute` (EDT-6).
+    func replaceData(of attribute: String, of object: PendingObjectID, from url: URL) {
+        let name = String(localized: "Replace \(attribute)")
+        stage { try await $0.setData(contentsOf: url, for: attribute, of: object, actionName: name) }
+    }
+
+    /// Empties a binary or transformable attribute (EDT-6).
+    func clearData(of attribute: String, of object: PendingObjectID) {
+        let name = String(localized: "Clear \(attribute)")
+        stage { try await $0.setData(nil, for: attribute, of: object, actionName: name) }
+    }
+
+    /// Stages a new value for one element of a composite attribute; `path` is `attribute.element` (EDT-7).
+    func setElement(_ value: Value, at path: String, of object: PendingObjectID) {
+        let name = String(localized: "Edit \(path)")
+        stage { try await $0.setElement(value, at: path, of: object, actionName: name) }
+    }
+
     /// Stages a new object of `entity`, and hands `inserted` the identity it is staged under — once it is, and
     /// only if this session is still the one attached.
     func insertObject(of entity: String, inserted: (@MainActor (PendingObjectID) -> Void)? = nil) {

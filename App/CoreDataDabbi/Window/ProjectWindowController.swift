@@ -1,5 +1,6 @@
 import AppKit
 import DabbiKit
+import SwiftUI
 
 /// A project's window: toolbar, the split-view tree, and the commands that are about the project as a whole.
 final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate, NSMenuItemValidation {
@@ -177,11 +178,54 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
     /// Stages the deletion of the rows selected in the grid. When the model's delete rules reach further than the
     /// rows, the window says how, and asks first (EDT-2).
     @IBAction func deleteObjects(_ sender: Any?) {
-        let objects = panes.centre.browse.grid.selectedPendingObjects
+        let objects = objectsToDelete
         context.editing.delete(objects) { [weak self] preview in
             await self?.confirmDelete(preview) ?? false
         }
     }
+
+    /// The rows selected in the grid, or in the change log while it is shown — deleting while tracking is
+    /// allowed, and the log then shows the deletion when it is committed (TRK-6). Only while the table has the
+    /// keyboard.
+    private var objectsToDelete: [PendingObjectID] {
+        let browse = panes.centre.browse
+        if context.tracking.isShowingLog {
+            guard window?.firstResponder === browse.tracking.tableView else { return [] }
+            return browse.tracking.selectedObjects.map(PendingObjectID.init)
+        }
+        guard window?.firstResponder === browse.grid.tableView else { return [] }
+        return browse.grid.selectedPendingObjects
+    }
+
+    /// Sets one attribute of many rows at once (EDT-4).
+    @IBAction func batchUpdate(_ sender: Any?) { showBatchEdit(.set) }
+
+    /// Replaces text in one attribute of many rows at once (EDT-4).
+    @IBAction func findAndReplace(_ sender: Any?) { showBatchEdit(.replace) }
+
+    /// Empties one attribute of many rows at once (EDT-4).
+    @IBAction func nullifyAttributes(_ sender: Any?) { showBatchEdit(.nullify) }
+
+    /// The batch edit sheet, for the rows selected in the grid or all of those it shows.
+    func showBatchEdit(_ kind: BatchEditModel.Kind) {
+        let grid = panes.centre.browse.grid
+        guard let spec = grid.shownFetch, context.editing.isEditable else { return }
+        let model = BatchEditModel(
+            context: context, kind: kind, fetch: spec, selection: grid.selectedPendingObjects,
+            attribute: context.focusedProperty)
+        let sheet = NSHostingController(rootView: BatchEditView(model: model))
+        sheet.title = kind.title
+        batchEditSheet = sheet
+        model.onClose = { [weak self, weak sheet] in
+            guard let sheet else { return }
+            self?.contentViewController?.dismiss(sheet)
+            if self?.batchEditSheet === sheet { self?.batchEditSheet = nil }
+        }
+        contentViewController?.presentAsSheet(sheet)
+    }
+
+    /// The batch edit sheet shown, for the tests.
+    private(set) var batchEditSheet: NSViewController?
 
     /// Opens the rows selected in the grid in windows of their own, for comparing side by side (BRW-9).
     @IBAction func openObjectWindows(_ sender: Any?) {
@@ -522,9 +566,12 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         case #selector(newObject(_:)):
             return context.canInsertObject && !context.tracking.isShowingLog
         case #selector(deleteObjects(_:)):
-            // Only from the grid: elsewhere ⌘⌫ is the text field's, deleting to the start of the line.
-            return context.editing.isEditable && window?.firstResponder === panes.centre.browse.grid.tableView
-                && !context.tracking.isShowingLog && !panes.centre.browse.grid.selectedPendingObjects.isEmpty
+            // Only from the grid or the change log: elsewhere ⌘⌫ is the text field's, deleting to the start of
+            // the line.
+            return context.editing.isEditable && !objectsToDelete.isEmpty
+        case #selector(batchUpdate(_:)), #selector(findAndReplace(_:)), #selector(nullifyAttributes(_:)):
+            return context.editing.isEditable && !context.tracking.isShowingLog
+                && panes.centre.browse.grid.shownFetch != nil
         case #selector(openObjectWindows(_:)):
             return !context.tracking.isShowingLog && !panes.centre.browse.grid.selectedPendingObjects.isEmpty
         case #selector(togglePendingChanges(_:)):

@@ -55,7 +55,18 @@ struct DetailsTab: View {
                         rendered: GridValue.render(property.value, timeZone: model.timeZone),
                         issue: issues.first { $0.property == property.name },
                         editing: model.fieldEditing(property.name, value: property.value, of: object),
-                        choosing: model.toOneChoosing(property.name, value: property.value, of: object))
+                        choosing: model.toOneChoosing(property.name, value: property.value, of: object),
+                        binary: model.binaryEditing(property.name, value: property.value, of: object))
+                    // A composite's elements, each a field of its own under it (EDT-7).
+                    ForEach(
+                        model.compositeFields(property.name, value: property.value, of: object), id: \.path
+                    ) { field in
+                        FieldRow(
+                            name: field.element.name, type: field.element.type.displayName,
+                            rendered: GridValue.render(field.value, timeZone: model.timeZone),
+                            issue: nil, editing: model.fieldEditing(field, of: object), choosing: nil,
+                            depth: field.depth)
+                    }
                 }
             }
             .padding(.vertical, 10)

@@ -183,7 +183,7 @@ extension ValueConverter {
         columns(for: object.entity.name ?? "", includeSubentities: false).properties
     }
 
-    private func label(of object: NSManagedObject) -> String? {
+    func label(of object: NSManagedObject) -> String? {
         let display = object.entity.name.flatMap { layouts[$0]?.displayAttribute }
             .flatMap { object.value(forKey: $0) as? String }
         return display.flatMap { $0.isEmpty ? nil : $0 }
