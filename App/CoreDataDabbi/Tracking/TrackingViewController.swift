@@ -120,6 +120,15 @@ final class TrackingViewController: NSViewController, NSTableViewDataSource, NST
                 storeWasReplaced: session.storeWasReplaced))
     }
 
+    /// The objects of the selected lines, each once, in the log's order — what Delete Rows deletes while the log
+    /// is shown (TRK-6).
+    var selectedObjects: [ObjectRef] {
+        var seen = Set<ObjectRef>()
+        return tableView.selectedRowIndexes.compactMap { session.log.object(at: $0) }.filter {
+            seen.insert($0).inserted
+        }
+    }
+
     /// Redraws the whole log. It holds thousands of lines at most — bounded by `TrackingLog.objectLimit` — so a
     /// reload costs less than working out which lines moved when everything above the newest one shifts down.
     private func reload() {

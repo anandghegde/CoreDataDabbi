@@ -35,6 +35,10 @@ struct FieldRow: View {
     let issue: ValidationIssue?
     let editing: FieldEditing?
     let choosing: ToOneChoosing?
+    /// A binary field's file commands (EDT-6).
+    var binary: BinaryEditing?
+    /// How deep a composite's element is under the attribute (EDT-7); 0 for a property.
+    var depth = 0
 
     /// Whether the value is being typed rather than only shown.
     @State private var isEditing = false
@@ -79,16 +83,23 @@ struct FieldRow: View {
             } else {
                 value
             }
+            if let binary {
+                binaryButtons(binary)
+            }
             if let problem {
                 warning(problem)
             } else if let issue {
                 warning(issue.message)
             }
         }
-        .padding(.horizontal, 12)
+        .padding(.leading, 12 + CGFloat(depth) * 14)
+        .padding(.trailing, 12)
         .padding(.vertical, 5)
         .help(rendered.tooltip ?? "")
         .contextMenu {
+            if let binary {
+                binaryMenu(binary)
+            }
             if let editing {
                 Button(String(localized: "Edit Value"), action: begin)
                 if let clear = editing.clear {
@@ -106,6 +117,9 @@ struct FieldRow: View {
         .accessibilityElement(children: isEditing ? .contain : .combine)
         .accessibilityLabel(DetailsTab.spoken(name, rendered.text, issue: issue))
         .accessibilityActions {
+            if let binary {
+                binaryMenu(binary)
+            }
             if editing != nil, !isEditing {
                 Button(String(localized: "Edit Value"), action: begin)
             } else if choosing != nil {
@@ -135,6 +149,37 @@ struct FieldRow: View {
             .onChange(of: isFocused) { _, focused in
                 if !focused { commit() }
             }
+    }
+
+    private func binaryButtons(_ binary: BinaryEditing) -> some View {
+        HStack(spacing: 6) {
+            if let replace = binary.replace {
+                Button(String(localized: "Replace from File…")) { replace() }
+                    .accessibilityLabel(String(localized: "Replace \(name) from File"))
+            }
+            if let save = binary.save {
+                Button(String(localized: "Save to File…")) { save() }
+                    .accessibilityLabel(String(localized: "Save \(name) to File"))
+            }
+            if let clear = binary.clear {
+                Button(String(localized: "Clear")) { clear() }
+                    .accessibilityLabel(String(localized: "Clear \(name)"))
+            }
+        }
+        .controlSize(.small)
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder private func binaryMenu(_ binary: BinaryEditing) -> some View {
+        if let replace = binary.replace {
+            Button(String(localized: "Replace from File…")) { replace() }
+        }
+        if let save = binary.save {
+            Button(String(localized: "Save to File…")) { save() }
+        }
+        if let clear = binary.clear {
+            Button(String(localized: "Clear")) { clear() }
+        }
     }
 
     private func warning(_ message: String) -> some View {

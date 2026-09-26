@@ -75,13 +75,29 @@ final class RelationshipsModel {
     @ObservationIgnored private var followed: Followed?
     @ObservationIgnored private var loadedFrom: ObjectIdentifier?
 
+    /// A detail window's panel lists one object's relationships, whatever the grid has selected, and what it picks
+    /// is its own rather than the inspector's (BRW-9). `nil` for the main window's panel.
+    let isPinned: Bool
+    /// The object a pinned panel lists; `nil` while it is only inserted.
+    var pinned: ObjectRef?
+    /// What a pinned panel has picked on the far side.
+    private var pinnedItem: PendingObjectID?
+
     init(context: ProjectContext) {
         self.context = context
+        isPinned = false
+        selected = context.local.selection.relationship
+    }
+
+    init(context: ProjectContext, pinned: ObjectRef?) {
+        self.context = context
+        isPinned = true
+        self.pinned = pinned
         selected = context.local.selection.relationship
     }
 
     /// The object whose relationships are listed: what the grid has selected, never what this panel has.
-    var source: ObjectRef? { context.navigation.current?.focus }
+    var source: ObjectRef? { isPinned ? pinned : context.navigation.current?.focus }
     var sessionIdentity: ObjectIdentifier? { context.session.map(ObjectIdentifier.init) }
 
     /// Bumped whenever what is staged may have changed.
@@ -91,6 +107,7 @@ final class RelationshipsModel {
     /// held here but read back from what the inspector and the content viewer are showing, so that a click back
     /// in the grid takes the highlight off it by itself.
     var selectedItem: PendingObjectID? {
+        if isPinned { return pinnedItem }
         guard let source, let inspected = context.inspectedObject, inspected != PendingObjectID(source) else {
             return nil
         }
@@ -257,7 +274,7 @@ final class RelationshipsModel {
     func select(_ name: String?) {
         guard selected != name else { return }
         selected = name
-        context.updateSelection { $0.relationship = name }
+        if !isPinned { context.updateSelection { $0.relationship = name } }
         if selectedItem != nil { selectItem(nil) }
         related = nil
         relatedError = nil
@@ -268,6 +285,10 @@ final class RelationshipsModel {
     /// Looks at one of the related objects: the inspector and the content viewer follow it, the grid does not
     /// (REL-1). `nil` gives them the grid's row back.
     func selectItem(_ object: PendingObjectID?) {
+        guard !isPinned else {
+            pinnedItem = object
+            return
+        }
         context.inspect(object ?? source.map(PendingObjectID.init))
     }
 
@@ -305,7 +326,10 @@ final class RelationshipsModel {
     func insertRelated(_ entity: String) {
         guard canEdit, insertableEntities.contains(entity), let source, let name = selected else { return }
         context.editing.insertRelatedObject(of: entity, to: PendingObjectID(source), through: name) {
-            [weak self] object in self?.context.inspect(object)
+            [weak self] object in
+            guard let self else { return }
+            // A detail window keeps it picked in its own list; the main window's panel shows it in the inspector.
+            if self.isPinned { self.pinnedItem = object } else { self.context.inspect(object) }
         }
     }
 

@@ -126,6 +126,16 @@ extension ValueConverter {
         PendingObjectID(uri: object.objectID.uriRepresentation(), entity: object.entity.name ?? "")
     }
 
+    /// A saved object's row, or one only inserted, which carries the identity it was staged under and a stand-in
+    /// reference (primary key 0) in place of the one its commit will give it.
+    func stagedRow(_ object: NSManagedObject, columns: ColumnSet, counts: ToManyCounts = [:]) -> RowSnapshot? {
+        guard object.objectID.isTemporaryID else { return row(object, columns: columns, counts: counts) }
+        guard let entity = object.entity.name, let values = values(of: object, columns: columns, counts: counts)
+        else { return nil }
+        let id = pendingID(of: object)
+        return RowSnapshot(ref: ObjectRef(entity: entity, pk: 0, uri: id.uri), values: values, inserted: id)
+    }
+
     private func inserted(_ object: NSManagedObject) -> PendingChange {
         let layout = object.entity.name.flatMap { layouts[$0] }
         let fields = storedProperties(of: object).compactMap { name -> PendingChange.Field? in
@@ -173,7 +183,7 @@ extension ValueConverter {
         columns(for: object.entity.name ?? "", includeSubentities: false).properties
     }
 
-    private func label(of object: NSManagedObject) -> String? {
+    func label(of object: NSManagedObject) -> String? {
         let display = object.entity.name.flatMap { layouts[$0]?.displayAttribute }
             .flatMap { object.value(forKey: $0) as? String }
         return display.flatMap { $0.isEmpty ? nil : $0 }

@@ -10,7 +10,7 @@ import DabbiKit
 final class GridViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
     let context: ProjectContext
 
-    let tableView = NSTableView()
+    let tableView = GridTableView()
     private let scrollView = NSScrollView()
     let footer = GridFooterView()
 
@@ -29,6 +29,15 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     /// the session is in a new generation, and the old pager is stale.
     private var shownRevision = 0
     private var shownCommits = 0
+    /// How many objects only inserted there were when the pager was opened: another number means another list,
+    /// since the grid lists them too (EDT-3).
+    private var shownInserted = 0
+    /// What the pager was opened with, to open it again when objects are inserted or their inserts undone.
+    private var shownSpec: FetchSpec?
+    /// The fetch whose rows the grid shows, its limit included: what a batch edit of all rows changes (EDT-4).
+    var shownFetch: FetchSpec? { shownSpec }
+    /// Opens an object in a window of its own (BRW-9): a double-click on a cell there is nothing to edit in.
+    var onOpenObject: ((PendingObjectID) -> Void)?
     /// Bumped per open; a pager that arrives after another open started is dropped.
     private var openAttempt = 0
     /// Only so that a test can wait for the rows the user simply watches arrive.
@@ -73,6 +82,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         tableView.target = self
         tableView.action = #selector(cellClicked)
         tableView.doubleAction = #selector(cellDoubleClicked)
+        // Return edits the selected row's cell, as a double-click does: the keyboard's way into the editor.
+        tableView.onReturn = { [weak self] in self?.editSelectedCell() ?? false }
 
         let headerMenu = NSMenu()
         headerMenu.delegate = self
@@ -130,6 +141,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         _ = context.timeZone
         let revision = context.editing.revision
         let commits = context.editing.commits
+        let inserted = context.editing.changes.count(of: .inserted)
 
         let identity = session.map(ObjectIdentifier.init)
         if location?.entity != shownEntity || location?.savedPredicate != shownPredicate || sort != shownSort
@@ -143,7 +155,12 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
             shownFilter = filter
             shownCap = cap
             shownSession = identity
+            shownInserted = inserted
             open(entity: location?.entity, sort: sort, filter: filter, in: session)
+        } else if inserted != shownInserted {
+            shownRevision = revision
+            shownInserted = inserted
+            refetch()
         } else if revision != shownRevision {
             shownRevision = revision
             rows?.reload()
@@ -157,6 +174,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         let attempt = openAttempt
         rows?.close()
         rows = nil
+        shownSpec = nil
         tableView.reloadData()
 
         guard let entity, let session, let model = context.model, let description = model.entity(named: entity) else {
@@ -169,10 +187,12 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
 
         let spec = FetchSpec(
             entity: entity, predicate: filter, sort: sort, limit: min(Self.firstPage, shownCap ?? .max))
+        shownSpec = spec
         openTask = Task { [weak self] in
             let handle: PagerHandle
             do {
-                handle = try await session.openPager(spec)
+                // Objects only inserted are rows too, from the moment they are staged (EDT-3).
+                handle = try await session.openPager(spec, includingInserted: true)
             } catch {
                 guard let self, self.openAttempt == attempt else { return }
                 self.footer.show(.failed(DabbiError.wrapping(error)))
@@ -183,6 +203,33 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
                 return
             }
             self.start(handle, of: description, in: model, session: session)
+        }
+    }
+
+    /// Runs the same fetch again and moves the rows onto it: an object was inserted, or its insert undone, and the
+    /// list is another one (EDT-3). The columns, the scroll position and the selection stay where they are.
+    private func refetch() {
+        guard let rows, let spec = shownSpec else { return }
+        openAttempt += 1
+        let attempt = openAttempt
+        let session = rows.session
+        openTask = Task { [weak self] in
+            let handle: PagerHandle
+            do {
+                handle = try await session.openPager(spec, includingInserted: true)
+            } catch {
+                guard let self, self.openAttempt == attempt else { return }
+                self.footer.show(.failed(DabbiError.wrapping(error)))
+                return
+            }
+            guard let self, self.openAttempt == attempt, self.rows === rows else {
+                await session.closePager(handle)
+                return
+            }
+            rows.replace(handle: handle)
+            self.tableView.reloadData()
+            self.updateVisibleRows()
+            self.updateFooter()
         }
     }
 
@@ -223,7 +270,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
             updateFooter()
             // The row the window was sent to is only identifiable once its page is in: a reveal lands here,
             // one page after the grid opened (REL-3).
-            if reference(at: tableView.selectedRow) != context.navigation.current?.focus { restoreSelection() }
+            if object(at: tableView.selectedRow) != selectionTarget { restoreSelection() }
         case .failed(let error):
             footer.show(.failed(error))
         }
@@ -416,10 +463,10 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     /// The rule of the model the staged value in this cell breaks, if it breaks one (EDT-2). The grid re-reads
     /// its rows whenever what is staged changes, which is what brings the cells back through here.
     func issue(at row: Int, column: GridColumn) -> ValidationIssue? {
-        guard !context.editing.changes.issues.isEmpty, let ref = reference(at: row) else { return nil }
+        guard !context.editing.changes.issues.isEmpty, let object = object(at: row) else { return nil }
         switch column.kind {
         case .attribute, .relationship:
-            return context.editing.issue(for: PendingObjectID(ref), property: column.property)
+            return context.editing.issue(for: object, property: column.property)
         case .objectID, .entity:
             return nil
         }
@@ -434,6 +481,11 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
             return .deleted
         case .row(let snapshot):
             switch column.kind {
+            case .objectID where snapshot.isInserted:
+                // No key until the commit gives it one; the temporary URI means nothing outside this window.
+                return GridValue(
+                    text: String(localized: "New"),
+                    tooltip: String(localized: "Not in the store until it is committed"))
             case .objectID:
                 return GridValue(text: String(snapshot.ref.pk), tooltip: snapshot.ref.uri.absoluteString)
             case .entity:
@@ -449,21 +501,43 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         }
     }
 
-    /// The selected rows' objects, in the grid's order. Rows not read yet, or deleted, are not among them.
+    /// The selected rows' saved objects, in the grid's order. Rows not read yet, deleted, or only inserted are not
+    /// among them.
     var selectedObjects: [ObjectRef] {
-        tableView.selectedRowIndexes.compactMap(reference(at:))
+        selectedPendingObjects.compactMap(\.ref)
     }
 
-    private func reference(at row: Int) -> ObjectRef? {
+    /// The selected rows' objects, those only inserted included: what an edit of the selection goes by.
+    var selectedPendingObjects: [PendingObjectID] {
+        tableView.selectedRowIndexes.compactMap(object(at:))
+    }
+
+    /// The object at `row`, if it has been read: saved, or only inserted.
+    func object(at row: Int) -> PendingObjectID? {
         guard let rows, row >= 0, row < rows.count, case .row(let snapshot) = rows.row(at: row) else { return nil }
-        return snapshot.ref
+        return snapshot.object
+    }
+
+    /// What the selection should be on: an object only inserted that the inspector shows — a new row is selected
+    /// as it is made — or else the row the context says the grid is at.
+    private var selectionTarget: PendingObjectID? {
+        if let inspected = context.inspectedObject, inspected.isInserted { return inspected }
+        return context.navigation.current?.focus.map(PendingObjectID.init)
     }
 
     // MARK: Selection
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isUpdating else { return }
-        context.focus(on: reference(at: tableView.selectedRow))
+        focusOnSelectedRow()
+    }
+
+    /// Tells the context which row is selected. A row only inserted has no reference to be the grid's place, so
+    /// it is inspected, which is all a row is to the rest of the window until it is committed.
+    private func focusOnSelectedRow() {
+        let object = object(at: tableView.selectedRow)
+        context.focus(on: object?.ref)
+        if let object, object.isInserted { context.inspect(object) }
     }
 
     /// Which cell was clicked, for the content viewer (CNT-1). Moving down a column with the keyboard keeps
@@ -479,8 +553,27 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     /// The cell being edited: what staging its text does, and the popover it is typed into.
     private(set) var editedCell: (editing: FieldEditing, popover: NSPopover)?
 
+    /// Edits the cell when there is something to edit in it, and otherwise opens the row in a window of its own
+    /// (BRW-9): the object-ID column, a relationship, a store that is locked.
     @objc private func cellDoubleClicked(_ sender: Any?) {
-        editCell(row: tableView.clickedRow, columnIndex: tableView.clickedColumn)
+        let row = tableView.clickedRow
+        guard row >= 0, !editCell(row: row, columnIndex: tableView.clickedColumn), let object = object(at: row)
+        else { return }
+        onOpenObject?(object)
+    }
+
+    /// Return in the grid: edits the column being read in the selected row — the one last clicked — or its first
+    /// editable one when that cannot be typed into. Says whether an editor opened.
+    @discardableResult
+    func editSelectedCell() -> Bool {
+        let row = tableView.selectedRow
+        guard row >= 0, tableView.selectedRowIndexes.count == 1 else { return false }
+        let indices = tableView.tableColumns.indices
+        let focused = context.focusedProperty.flatMap { property in
+            indices.first { tableView.tableColumns[$0].identifier.rawValue == property }
+        }
+        if let focused, editCell(row: row, columnIndex: focused) { return true }
+        return indices.contains { editCell(row: row, columnIndex: $0) }
     }
 
     /// Opens an editor over the cell at `row` and `index` when its value is an attribute that can be typed and the
@@ -496,7 +589,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         let read = rows.columns ?? rows.handle.columns
         guard let position = read.index(of: column.property), position < snapshot.values.count,
             let editing = context.fieldEditing(
-                column.property, value: snapshot.values[position], of: PendingObjectID(snapshot.ref))
+                column.property, value: snapshot.values[position], of: snapshot.object)
         else { return false }
         editedCell?.popover.close()
         let popover = CellEditor.show(
@@ -516,7 +609,7 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
         case .attribute, .relationship:
             // A click in the grid is also a click away from whatever the relationships panel had picked: the
             // column being read belongs to this row (REL-1).
-            context.focus(on: reference(at: tableView.selectedRow))
+            focusOnSelectedRow()
             context.focus(onProperty: property)
         default:
             break
@@ -527,8 +620,8 @@ final class GridViewController: NSViewController, NSTableViewDataSource, NSTable
     /// the window said to show an object. A row outside what has been read cannot be found yet; the object is
     /// still shown in the inspector, so nothing is lost but the highlight.
     private func restoreSelection() {
-        guard let focus = context.navigation.current?.focus, let rows else { return }
-        for row in 0..<min(rows.count, PagedRows.searchLimit) where reference(at: row) == focus {
+        guard let target = selectionTarget, let rows else { return }
+        for row in 0..<min(rows.count, PagedRows.searchLimit) where object(at: row) == target {
             isUpdating = true
             tableView.selectRowIndexes([row], byExtendingSelection: false)
             tableView.scrollRowToVisible(row)

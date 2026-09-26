@@ -46,7 +46,7 @@ final class ProjectContext {
     @ObservationIgnored private var focusedPropertyEntity: String?
     /// The object the inspector and the content viewer read: the grid's selection, or — while one is picked in
     /// the relationships panel — a related object the grid is not showing (REL-1), or one only inserted, which
-    /// no grid shows until it is committed (EDT-3).
+    /// has no reference until it is committed (EDT-3).
     private(set) var inspectedObject: PendingObjectID?
     /// Whose store this is, for the status capsule: `nil` for a store picked as a file, whose path says it.
     private(set) var locationOrigin: String?
@@ -361,7 +361,7 @@ final class ProjectContext {
     }
 
     /// Stages a new object of the grid's entity and shows it in the inspector, where its fields are filled in
-    /// (EDT-3). The grid does not list it until it is committed.
+    /// (EDT-3). The grid lists it among its rows, marked New, and selects it.
     func insertObject() {
         guard canInsertObject, let entity = selectedEntity else { return }
         editing.insertObject(of: entity) { [weak self] object in self?.inspect(object) }

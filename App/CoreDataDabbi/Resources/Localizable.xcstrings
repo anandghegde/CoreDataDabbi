@@ -15,6 +15,16 @@
         }
       }
     },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
     "%@ (%lld)" : {
       "localizations" : {
         "en" : {
@@ -37,6 +47,9 @@
           }
         }
       }
+    },
+    "%@ has no attribute this edit can change." : {
+
     },
     "%@ of %@" : {
       "localizations" : {
@@ -221,6 +234,16 @@
     "%lld objects have changes that are not in the store yet. Discarded changes cannot be recovered." : {
 
     },
+    "%lld of %lld rows will change." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld rows will change."
+          }
+        }
+      }
+    },
     "%lld of its own, %lld with its subentities" : {
       "comment" : "Tooltip on the row count of an entity that has subentities",
       "localizations" : {
@@ -274,6 +297,9 @@
     "A container was too large to search to the end; some stores may be missing." : {
 
     },
+    "A new object's relationships can be followed here once it is committed." : {
+
+    },
     "A snapshot cannot be restored while another app has the store open. Quit it, then restore?" : {
 
     },
@@ -290,6 +316,9 @@
 
     },
     "Abstract — its rows are its subentities'" : {
+
+    },
+    "All rows shown" : {
 
     },
     "Allow Editing" : {
@@ -310,6 +339,15 @@
     "App groups no installed app claims" : {
 
     },
+    "Apply" : {
+
+    },
+    "Attribute to change" : {
+
+    },
+    "Attribute:" : {
+
+    },
     "Attributes" : {
 
     },
@@ -321,6 +359,15 @@
     },
     "Backup taken %@" : {
       "comment" : "Snapshot tooltip; the argument is a date"
+    },
+    "Batch Update" : {
+
+    },
+    "Batch Update %@" : {
+
+    },
+    "Batch Update…" : {
+
     },
     "Before editing" : {
 
@@ -397,7 +444,13 @@
     "Choose a relationship" : {
 
     },
+    "Choose an attribute." : {
+
+    },
     "Choose an entity in the sidebar." : {
+
+    },
+    "Choose the file whose contents replace %@." : {
 
     },
     "Choose “%@”" : {
@@ -407,6 +460,12 @@
 
     },
     "Class" : {
+
+    },
+    "Clear" : {
+
+    },
+    "Clear %@" : {
 
     },
     "Clear Filter" : {
@@ -622,6 +681,9 @@
     "Edit Value" : {
 
     },
+    "Edit:" : {
+
+    },
     "Editable" : {
 
     },
@@ -688,6 +750,18 @@
     "Filter rows — age > 30 AND name BEGINSWITH[cd] \"a\"" : {
       "comment" : "Placeholder of the predicate field, with an example predicate"
     },
+    "Find" : {
+
+    },
+    "Find and Replace" : {
+
+    },
+    "Find and Replace…" : {
+
+    },
+    "Find:" : {
+
+    },
     "First %lld rows" : {
       "comment" : "Row count cut short by the fetch limit"
     },
@@ -740,6 +814,9 @@
 
     },
     "Hide earlier versions" : {
+
+    },
+    "Ignore case" : {
 
     },
     "Import" : {
@@ -816,6 +893,9 @@
 
     },
     "Kind" : {
+
+    },
+    "Kind of edit" : {
 
     },
     "Large values are kept in files beside the store" : {
@@ -941,6 +1021,12 @@
     "New related object, linked to this object" : {
 
     },
+    "New value" : {
+
+    },
+    "New value:" : {
+
+    },
     "New — not in the store until it is committed" : {
 
     },
@@ -993,6 +1079,9 @@
     "No row selected" : {
 
     },
+    "No rows would change (%lld matched)." : {
+
+    },
     "No simulators" : {
 
     },
@@ -1012,6 +1101,12 @@
 
     },
     "None of this device's apps has a Core Data or SwiftData store the filters allow." : {
+
+    },
+    "Not committed yet" : {
+
+    },
+    "Not in the store until it is committed" : {
 
     },
     "Not known" : {
@@ -1047,6 +1142,15 @@
     "Nullify" : {
 
     },
+    "Nullify %@" : {
+
+    },
+    "Nullify Attributes" : {
+
+    },
+    "Nullify Attributes…" : {
+
+    },
     "OK" : {
 
     },
@@ -1078,6 +1182,9 @@
 
     },
     "Open in Browser" : {
+
+    },
+    "Open in Separate Window" : {
 
     },
     "Open this store in a new project" : {
@@ -1182,6 +1289,9 @@
     "Refresh" : {
 
     },
+    "Regular expression" : {
+
+    },
     "Related objects" : {
 
     },
@@ -1207,6 +1317,27 @@
 
     },
     "Rendered" : {
+
+    },
+    "Replace" : {
+
+    },
+    "Replace %@" : {
+
+    },
+    "Replace %@ from File" : {
+
+    },
+    "Replace from File…" : {
+
+    },
+    "Replace in %@" : {
+
+    },
+    "Replace with" : {
+
+    },
+    "Replace with:" : {
 
     },
     "Restore" : {
@@ -1237,6 +1368,12 @@
 
     },
     "Rows that fail:" : {
+
+    },
+    "Rows to change" : {
+
+    },
+    "Rows:" : {
 
     },
     "Rows: %lld · Columns: %lld" : {
@@ -1273,10 +1410,22 @@
     "SQLite" : {
 
     },
+    "Sample of the rows that change" : {
+
+    },
     "Save" : {
 
     },
+    "Save %@ to File" : {
+
+    },
     "Save Predicate" : {
+
+    },
+    "Save the contents of %@ to a file." : {
+
+    },
+    "Save to File…" : {
 
     },
     "Saved Predicates" : {
@@ -1310,6 +1459,9 @@
 
     },
     "Selected Rows as JSON…" : {
+
+    },
+    "Selected rows (%lld)" : {
 
     },
     "Semicolon" : {
@@ -1375,6 +1527,9 @@
     "Show only simulators that are running" : {
 
     },
+    "Show or hide this object's relationships" : {
+
+    },
     "Show the next place" : {
 
     },
@@ -1413,6 +1568,9 @@
     },
     "Some changes cannot be tracked exactly" : {
       "comment" : "Footer warning for reduced-fidelity tracking"
+    },
+    "Stages the change as one edit that can be undone." : {
+
     },
     "Status" : {
 
@@ -1472,6 +1630,9 @@
 
     },
     "The PDF could not be read." : {
+
+    },
+    "The attribute is set to nil on every row." : {
 
     },
     "The builder could not show this predicate. It is kept as text." : {
@@ -1548,6 +1709,9 @@
       "comment" : "Shown when the watched app reinstalled or restored its store"
     },
     "The store is editable. Click to make it read-only." : {
+
+    },
+    "The store is not open." : {
 
     },
     "The store is open in %@" : {

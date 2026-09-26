@@ -144,20 +144,29 @@ public actor StoreSession {
     private struct Pager {
         var ids: [NSManagedObjectID]
         var hasMore: Bool
+        /// Whether objects only inserted are listed too (`openPager(_:includingInserted:)`).
+        var includingInserted = false
     }
 
     /// Runs the fetch once, for object IDs only, and keeps the list. Pages are cut from it on demand.
     ///
     /// With a fetch limit the list stops there, and `hasMore` tells whether `loadMore` would add to it.
-    public func openPager(_ spec: FetchSpec) async throws -> PagerHandle {
+    ///
+    /// - Parameter includingInserted: list objects only inserted too, as `RowSnapshot.inserted` rows (EDT-3) —
+    ///   what the grid shows. Without it, as for everything that goes by `ObjectRef` (export, the tracker), they
+    ///   are left out and do not count against the limit.
+    public func openPager(_ spec: FetchSpec, includingInserted: Bool = false) async throws -> PagerHandle {
         // One more than the limit: the extra row is never shown, it only says that there is more.
         let window = spec.limit.map { (offset: 0, limit: max(0, $0) + 1) }
         let request = try fetchRequest(for: spec, resultType: NSManagedObjectID.self, window: window)
         let failure: DabbiError.Code = spec.predicate == nil ? .fetchFailed : .invalidPredicate
         // An editable session's fetches include what is staged. An object that is only inserted has a temporary
-        // identity and no reference yet, so it has no row to show; it is listed with the pending changes.
-        var ids = try await stack.perform {
-            try CoreDataStack.fetch(request.value, in: $0, failure: failure).filter { !$0.isTemporaryID }
+        // identity and no reference yet; unless it is asked for, it is listed with the pending changes only.
+        var ids = try await stack.perform { context in
+            guard !includingInserted else {
+                return try CoreDataStack.fetch(request.value, in: context, failure: failure)
+            }
+            return try Self.savedIDs(request.value, in: context, failure: failure)
         }
         try ensureOpen()
         let hasMore = spec.limit.map { ids.count > max(0, $0) } ?? false
@@ -166,7 +175,7 @@ public actor StoreSession {
             id: UUID(), spec: spec, count: ids.count, hasMore: hasMore,
             columns: stack.converter.columns(for: spec.entity, includeSubentities: spec.includeSubentities),
             generation: generation)
-        pagers[handle.id] = Pager(ids: ids, hasMore: hasMore)
+        pagers[handle.id] = Pager(ids: ids, hasMore: hasMore, includingInserted: includingInserted)
         return handle
     }
 
@@ -180,11 +189,12 @@ public actor StoreSession {
         let pager = try pager(for: handle)
         guard pager.hasMore, pager.ids.count <= handle.count else { return Self.handle(handle, reflecting: pager) }
         let batch = max(1, count ?? handle.spec.limit ?? Self.pageSize)
+        let includingInserted = pager.includingInserted
         let offset = pager.ids.count
         let request = try fetchRequest(
             for: handle.spec, resultType: NSManagedObjectID.self, window: (offset: offset, limit: batch + 1))
         var more = try await stack.perform {
-            try CoreDataStack.fetch(request.value, in: $0).filter { !$0.isTemporaryID }
+            try CoreDataStack.fetch(request.value, in: $0).filter { includingInserted || !$0.isTemporaryID }
         }
 
         // The actor was free during the fetch: the pager may be gone, or somebody else may have extended it.
@@ -286,7 +296,7 @@ public actor StoreSession {
         }
 
         let byID = Dictionary(fetched.map { ($0.objectID, $0) }, uniquingKeysWith: { first, _ in first })
-        return ids.map { id in byID[id].flatMap { converter.row($0, columns: columns, counts: counts) } }
+        return ids.map { id in byID[id].flatMap { converter.stagedRow($0, columns: columns, counts: counts) } }
     }
 
     // MARK: Single objects
@@ -449,8 +459,22 @@ public actor StoreSession {
         let window = limit.map { (offset: 0, limit: $0) }
         let request = try fetchRequest(for: spec, resultType: NSManagedObjectID.self, window: window)
         let failure: DabbiError.Code = spec.predicate == nil ? .fetchFailed : .invalidPredicate
-        let ids = try await stack.perform { try CoreDataStack.fetch(request.value, in: $0, failure: failure) }
+        let ids = try await stack.perform { try Self.savedIDs(request.value, in: $0, failure: failure) }
         return ids.compactMap { ObjectRef(uri: $0.uriRepresentation()) }
+    }
+
+    /// A fetch's saved objects only. Objects only inserted are matched too, in memory, and count against a fetch
+    /// limit; the limit is raised by as many as there are, and the list cut back to it, so that they never take a
+    /// saved object's place and then vanish, leaving the list short.
+    private static func savedIDs(
+        _ request: NSFetchRequest<NSManagedObjectID>, in context: NSManagedObjectContext, failure: DabbiError.Code
+    ) throws -> [NSManagedObjectID] {
+        let limit = request.fetchLimit
+        let pending = context.insertedObjects.count
+        if limit > 0, pending > 0 { request.fetchLimit = limit + pending }
+        defer { request.fetchLimit = limit }
+        let saved = try CoreDataStack.fetch(request, in: context, failure: failure).filter { !$0.isTemporaryID }
+        return limit > 0 ? Array(saved.prefix(limit)) : saved
     }
 
     /// Reads many objects at once, each by its own entity's layout — how the tracker materialises the primary keys
@@ -579,12 +603,12 @@ public actor StoreSession {
     }
 
     /// `NSFetchRequest` is not `Sendable`; this one is built here and only ever used inside one `perform`.
-    private struct Request<Result: NSFetchRequestResult>: @unchecked Sendable {
+    struct Request<Result: NSFetchRequestResult>: @unchecked Sendable {
         let value: NSFetchRequest<Result>
     }
 
     /// - Parameter window: the rows of the result to fetch, instead of the spec's limit.
-    private func fetchRequest<Result: NSFetchRequestResult>(
+    func fetchRequest<Result: NSFetchRequestResult>(
         for spec: FetchSpec, resultType: Result.Type, window: (offset: Int, limit: Int)? = nil
     ) throws -> Request<Result> {
         try ensureOpen()
