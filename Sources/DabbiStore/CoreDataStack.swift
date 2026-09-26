@@ -148,11 +148,20 @@ final class CoreDataStack: @unchecked Sendable {
             // would record that as a new edit of its own and forget the redo stack.
             undoManager.disableUndoRegistration()
             defer {
-                browse.refreshAllObjects()
+                Self.refreshKeepingStaged(browse)
                 browse.processPendingChanges()
                 undoManager.enableUndoRegistration()
             }
             return try body(browse)
+        }
+    }
+
+    /// `refreshAllObjects`, less the staged deletes: refreshing one while another object has staged changes
+    /// crashes Core Data as it takes an undo snapshot of the deleted object. A delete has nothing to re-apply, and
+    /// its row is compared before the commit all the same.
+    private static func refreshKeepingStaged(_ context: NSManagedObjectContext) {
+        for object in context.registeredObjects where !object.isDeleted {
+            context.refresh(object, mergeChanges: object.hasChanges)
         }
     }
 
@@ -195,6 +204,8 @@ final class CoreDataStack: @unchecked Sendable {
                 undoManager.undo()
             } else {
                 Self.adjustUndoDepth(of: browse, by: 1)
+                // What the edit was made against, for the commit's conflict check (EDT-10).
+                Self.recordOriginals(in: browse)
             }
             return (try result.get(), Self.pendingChanges(in: browse, converter: converter))
         }

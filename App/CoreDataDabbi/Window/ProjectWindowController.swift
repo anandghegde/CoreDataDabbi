@@ -62,6 +62,14 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
             guard let self else { return decide(false) }
             self.askToQuit(holders, canQuit: canQuit, decide)
         }
+        context.onCommitGuards = { [weak self] guards, canQuit, decide in
+            guard let self else { return decide(.cancel) }
+            self.askAboutGuards(guards, canQuit: canQuit, decide)
+        }
+        context.onCommitConflicts = { [weak self] conflicts, decide in
+            guard let self else { return decide(nil) }
+            self.askAboutConflicts(conflicts, decide)
+        }
         observation = ObservationLoop { [weak self] in self?.showStatus() }
         changesObservation = ObservationLoop { [weak self] in self?.revealFirstChange() }
     }
@@ -293,6 +301,80 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         } else {
             alert.runModal()
         }
+    }
+
+    /// The store is mirrored to CloudKit, or open in other processes (EDT-10, EDT-11): say what committing means
+    /// then, and offer to quit the processes first when there is a way to.
+    private func askAboutGuards(
+        _ guards: CommitGuards, canQuit: Bool, _ decide: @escaping @MainActor (CommitGuardAnswer) -> Void
+    ) {
+        guard let window, window.attachedSheet == nil else { return decide(.cancel) }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = Self.guardsTitle(guards)
+        alert.informativeText = Self.guardsExplanation(guards, canQuit: canQuit)
+        if canQuit {
+            alert.addButton(withTitle: String(localized: "Quit and Commit"))
+            alert.addButton(withTitle: String(localized: "Commit Anyway"))
+        } else {
+            alert.addButton(withTitle: String(localized: "Commit Anyway"))
+        }
+        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.beginSheetModal(for: window) { response in
+            switch (canQuit, response) {
+            case (true, .alertFirstButtonReturn): decide(.quitAndCommit)
+            case (true, .alertSecondButtonReturn), (false, .alertFirstButtonReturn): decide(.commit)
+            default: decide(.cancel)
+            }
+        }
+    }
+
+    static func guardsTitle(_ guards: CommitGuards) -> String {
+        let names = guards.holders.map(\.name).joined(separator: ", ")
+        switch (guards.mirroredToCloudKit, guards.holders.isEmpty) {
+        case (true, true): return String(localized: "This store is synced with iCloud")
+        case (true, false): return String(localized: "This store is synced with iCloud and open in \(names)")
+        default: return String(localized: "The store is open in \(names)")
+        }
+    }
+
+    static func guardsExplanation(_ guards: CommitGuards, canQuit: Bool) -> String {
+        var lines: [String] = []
+        if guards.mirroredToCloudKit {
+            lines.append(
+                String(
+                    localized:
+                        "Its app mirrors it to CloudKit: what is committed is exported to iCloud the next time the app runs, and reaches every device on the account."
+                ))
+        }
+        if !guards.holders.isEmpty {
+            lines.append(
+                String(
+                    localized:
+                        "An app that has the store open does not see the edits until it reads the rows again, and may save its own over them."
+                ))
+            if canQuit {
+                lines.append(String(localized: "Quit it first to have it read them afresh when it next runs."))
+            }
+        }
+        return lines.joined(separator: "\n\n")
+    }
+
+    /// The store changed underneath staged edits (EDT-10): Mine or Theirs, per object, before the commit.
+    private func askAboutConflicts(
+        _ conflicts: [CommitConflict],
+        _ decide: @escaping @MainActor ([PendingObjectID: CommitConflict.Choice]?) -> Void
+    ) {
+        guard let window, window.attachedSheet == nil, let content = window.contentViewController else {
+            return decide(nil)
+        }
+        let model = CommitConflictsView.Model(conflicts: conflicts, timeZone: context.timeZone)
+        let sheet = CommitConflictsController(model)
+        model.onFinish = { [weak sheet] answer in
+            if let sheet { content.dismiss(sheet) }
+            decide(answer)
+        }
+        content.presentAsSheet(sheet)
     }
 
     // MARK: Snapshots (§7.3)

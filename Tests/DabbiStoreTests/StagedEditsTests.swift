@@ -211,6 +211,25 @@ import Testing
         await session.close()
     }
 
+    /// Browsing refreshes what is staged — which, for a staged delete beside another object's staged edit, used to
+    /// crash Core Data as it took an undo snapshot of the deleted object.
+    @Test func browsingWithAnEditAndADeleteStagedKeepsBoth() async throws {
+        let (session, location) = try await open(.basic)
+        let refs = try await session.references(FetchSpec(entity: "Sample"), limit: 2)
+        try #require(refs.count == 2)
+        try await session.setValue(.string("Staged"), for: "name", of: PendingObjectID(refs[0]))
+        try await session.delete([PendingObjectID(refs[1])])
+
+        #expect(try await session.count(FetchSpec(entity: "Sample")) == 39)
+        #expect(try await session.object(refs[0])["name"] == .string("Staged"))
+        #expect(try await session.commitConflicts().isEmpty)
+
+        _ = try await session.commit()
+        #expect(try fileValue(location, "SELECT ZNAME FROM ZSAMPLE WHERE Z_PK = \(refs[0].pk)") == .text("Staged"))
+        #expect(try fileValue(location, "SELECT COUNT(*) FROM ZSAMPLE WHERE Z_PK = \(refs[1].pk)") == .integer(0))
+        await session.close()
+    }
+
     @Test func insertedObjectsAreListedButNotPaged() async throws {
         let (session, _) = try await open(.basic)
         let (object, changes) = try await session.insertObject(entity: "Sample", actionName: "New Sample")

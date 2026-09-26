@@ -167,6 +167,26 @@
         }
       }
     },
+    "%@: mine %@, theirs %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: mine %2$@, theirs %3$@"
+          }
+        }
+      }
+    },
+    "%@: mine %@, theirs %@, both changed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: mine %2$@, theirs %3$@, both changed"
+          }
+        }
+      }
+    },
     "%lld added" : {
       "comment" : "Links gained"
     },
@@ -205,6 +225,9 @@
     "%lld objects" : {
       "comment" : "Number of objects in a relationship"
     },
+    "%lld objects changed in the store since they were edited" : {
+
+    },
     "%lld objects have changes that are not in the store yet. Discarded changes cannot be recovered." : {
 
     },
@@ -240,7 +263,13 @@
     "%lld versions" : {
 
     },
+    "(deleted)" : {
+
+    },
     "1 app installed" : {
+
+    },
+    "1 object changed in the store since it was edited" : {
 
     },
     "1 problem" : {
@@ -280,6 +309,9 @@
 
     },
     "Also deleted, by Cascade rules: %@" : {
+
+    },
+    "An app that has the store open does not see the edits until it reads the rows again, and may save its own over them." : {
 
     },
     "An empty string, not nil" : {
@@ -414,6 +446,9 @@
     "Commit" : {
 
     },
+    "Commit Anyway" : {
+
+    },
     "Commit the pending changes first?" : {
 
     },
@@ -504,6 +539,12 @@
     "Deleted" : {
 
     },
+    "Deleted here, saved again in the store." : {
+
+    },
+    "Deleted in the store. The staged edits can only be let go." : {
+
+    },
     "Deleted while it was being read" : {
 
     },
@@ -571,6 +612,9 @@
 
     },
     "Editable" : {
+
+    },
+    "Edited here, saved again in the store." : {
 
     },
     "Edits are staged here until they are committed to the store." : {
@@ -696,7 +740,19 @@
     "Inverse" : {
 
     },
+    "Its app mirrors it to CloudKit: what is committed is exported to iCloud the next time the app runs, and reaches every device on the account." : {
+
+    },
     "Join tables" : {
+
+    },
+    "Keep" : {
+
+    },
+    "Keep for %@" : {
+
+    },
+    "Keeps the staged edits of every object that is still there." : {
 
     },
     "Kept in history" : {
@@ -721,6 +777,9 @@
 
     },
     "Length" : {
+
+    },
+    "Lets the staged edits of every object go." : {
 
     },
     "Link" : {
@@ -778,6 +837,9 @@
 
     },
     "May be stored outside the database" : {
+
+    },
+    "Mine" : {
 
     },
     "Minimize" : {
@@ -1008,7 +1070,13 @@
     "Quit %@" : {
 
     },
+    "Quit and Commit" : {
+
+    },
     "Quit and Restore" : {
+
+    },
+    "Quit it first to have it read them afresh when it next runs." : {
 
     },
     "Range" : {
@@ -1242,6 +1310,9 @@
     "Some changes cannot be tracked exactly" : {
       "comment" : "Footer warning for reduced-fidelity tracking"
     },
+    "Somebody else saved these objects after they were edited here. Choose whose values the commit keeps: Mine writes the staged edits over theirs, Theirs lets the staged edits go." : {
+
+    },
     "Status" : {
 
     },
@@ -1390,6 +1461,9 @@
     "The table could not be read." : {
 
     },
+    "Theirs" : {
+
+    },
     "There is no model to build a predicate from." : {
 
     },
@@ -1415,6 +1489,12 @@
 
     },
     "This store cannot be edited" : {
+
+    },
+    "This store is synced with iCloud" : {
+
+    },
+    "This store is synced with iCloud and open in %@" : {
 
     },
     "Time Zone" : {
@@ -1487,6 +1567,12 @@
 
     },
     "Use %@" : {
+
+    },
+    "Use All Mine" : {
+
+    },
+    "Use All Theirs" : {
 
     },
     "Use Cached Model" : {

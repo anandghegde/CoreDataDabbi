@@ -130,6 +130,7 @@ extension StoreSession {
         try await stack.performEditing { context, _ in
             context.rollback()
             CoreDataStack.clearUndo(of: context)
+            CoreDataStack.forgetOriginals(in: context)
             context.refreshAllObjects()
         }
         insertedObjectIDs.removeAll()
@@ -146,8 +147,14 @@ extension StoreSession {
     /// were inserted have their primary keys — and the history of a store that records it names this session's
     /// author (EDT-5).
     ///
+    /// Once `prepare` has returned, the staged objects are compared with their rows in the store: one somebody
+    /// else saved or deleted since it was first edited here is a conflict, and the commit is refused with
+    /// `.commitConflict` until `resolveConflicts` has settled it (EDT-10). Compared last, so that no save lands
+    /// unseen while the backup is taken.
+    ///
     /// Throws `.validationFailed`, `.commitConflict` or `.commitFailed`, with everything still staged: nothing
-    /// was written.
+    /// was written. A failed `prepare` is `.commitPreparationFailed` — unless it refused with
+    /// `.commitUnconfirmed`, which is passed on as it is.
     public func commit(prepare: @Sendable () async throws -> Void = {}) async throws -> CommitSummary {
         try ensureOpen()
         guard stack.isEditable else { throw CoreDataStack.notEditable }
@@ -155,6 +162,8 @@ extension StoreSession {
         guard hasChanges else { return CommitSummary(inserted: 0, updated: 0, deleted: 0, generation: generation) }
         do {
             try await prepare()
+        } catch let error as DabbiError where error.code == .commitUnconfirmed {
+            throw error
         } catch {
             let cause = error as? DabbiError
             throw DabbiError(
@@ -162,6 +171,8 @@ extension StoreSession {
                 diagnosis: cause?.diagnosis ?? [], recovery: cause?.recovery ?? [], underlying: error)
         }
         try ensureOpen()
+        let conflicts = try await commitConflicts()
+        guard conflicts.isEmpty else { throw Self.conflictError(conflicts) }
         let (converter, translator) = (stack.converter, ValidationTranslator(converter: stack.converter))
         let (counts, insertedRefs) = try await stack.performEditing { context, _ in
             let counts = (
@@ -178,6 +189,7 @@ extension StoreSession {
                 throw Self.commitError(error, translator: translator)
             }
             CoreDataStack.clearUndo(of: context)
+            CoreDataStack.forgetOriginals(in: context)
             var insertedRefs: [PendingObjectID: ObjectRef] = [:]
             for (object, staged) in inserted {
                 insertedRefs[staged] = ObjectRef(uri: object.objectID.uriRepresentation())

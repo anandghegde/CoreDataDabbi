@@ -68,6 +68,20 @@ final class ProjectContext {
     /// offers to quit them when `canQuit`, and hands `decide` whether to. Without it the restore is refused.
     @ObservationIgnored var onStoreInUse:
         ((_ holders: [LiveProcess], _ canQuit: Bool, _ decide: @escaping @MainActor (Bool) -> Void) -> Void)?
+    /// A commit's guards stand, and have not been put to the user this session (EDT-10, EDT-11). The window says
+    /// what they mean — offering to quit the processes that have the store open when `canQuit` — and hands
+    /// `decide` the answer. Without it such a commit is not made.
+    @ObservationIgnored var onCommitGuards:
+        ((_ guards: CommitGuards, _ canQuit: Bool, _ decide: @escaping @MainActor (CommitGuardAnswer) -> Void) -> Void)?
+    /// The store changed underneath staged edits (EDT-10). The window shows the conflicts and hands `decide` a
+    /// choice per object, or `nil` to leave everything staged. Without it the commit is not made.
+    @ObservationIgnored var onCommitConflicts:
+        (
+            (
+                _ conflicts: [CommitConflict],
+                _ decide: @escaping @MainActor ([PendingObjectID: CommitConflict.Choice]?) -> Void
+            ) -> Void
+        )?
     /// How the holders of a store are asked to quit; the tests stop their own. `nil` is ``StoreHolders``.
     @ObservationIgnored var quitHolders: (@MainActor (_ holders: [LiveProcess], _ store: URL) async throws -> Void)?
     /// Where simulators are looked for; the tests have a device set of their own.
@@ -110,6 +124,8 @@ final class ProjectContext {
             self?.snapshots.refresh()
             self?.followCommittedObject()
         }
+        editing.confirmGuards = { [weak self] guards in await self?.confirmCommit(through: guards) ?? false }
+        editing.resolveConflicts = { [weak self] conflicts in await self?.askAboutConflicts(conflicts) }
     }
 
     // MARK: Reading
