@@ -206,6 +206,8 @@ enum MainMenu {
         // A copy of the store to come back to (§7.3); restoring one is in the sidebar's Snapshots section.
         menu.addItem(item(String(localized: "Take Snapshot…"), #selector(ProjectWindowController.takeSnapshot(_:))))
         menu.addItem(.separator())
+        // Rows from a CSV or JSON file, staged into the entity on screen (IMX-2).
+        menu.addItem(item(String(localized: "Import…"), #selector(ProjectWindowController.importFile(_:))))
         menu.addItem(export())
         menu.addItem(.separator())
         // Play and Stop as one item whose title says which it is. Shift-Command-R is Reload Store, so tracking

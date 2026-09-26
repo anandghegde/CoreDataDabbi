@@ -5,7 +5,7 @@
 // `Exporter`, which only turns records into text: `CSVExporter` (and TSV), `JSONExporter`,
 // `MarkdownTableExporter`. `TrackedSessionExport` does the same for a tracker's version log.
 //
-// Import (IMX-2 – IMX-4): `CSVTable` and `JSONNode` parse a file, `ImportMapping` maps its columns onto an
+// Import (IMX-2 – IMX-4): `ImportTable` and `JSONNode` parse a file, `ImportMapping` maps its columns onto an
 // entity's properties and coerces the text with `ValueText`, and the rows it makes are staged by
 // `StoreSession.importRows` — dry run first, then as one undoable edit that Commit writes like any other.
 //

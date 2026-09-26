@@ -28,6 +28,16 @@
     "%@ Selection" : {
 
     },
+    "%@ by %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ by %2$@"
+          }
+        }
+      }
+    },
     "%@ of %@" : {
       "localizations" : {
         "en" : {
@@ -270,6 +280,9 @@
     "A snapshot cannot be restored while another process has the store open. Quit it, then try again." : {
 
     },
+    "A to-many column read by key takes its keys separated by “|”. Imported rows are staged: Commit writes them." : {
+
+    },
     "About %@" : {
 
     },
@@ -372,6 +385,9 @@
     "Choose Store…" : {
 
     },
+    "Choose a CSV or JSON file, as an export writes them." : {
+
+    },
     "Choose a Core Data or SwiftData store." : {
 
     },
@@ -412,6 +428,12 @@
 
     },
     "Collapse" : {
+
+    },
+    "Column" : {
+
+    },
+    "Column mapping" : {
 
     },
     "Columns (%lld)" : {
@@ -567,6 +589,9 @@
     "Display" : {
 
     },
+    "Do Not Import" : {
+
+    },
     "Does not fit the model" : {
       "comment" : "Saved predicate warning badge"
     },
@@ -574,6 +599,9 @@
 
     },
     "Drop a store, an app bundle or an .xcappdata container here." : {
+
+    },
+    "Dry Run" : {
 
     },
     "Duplicate" : {
@@ -636,6 +664,9 @@
     "External storage" : {
 
     },
+    "Failed" : {
+
+    },
     "Fetch Requests" : {
 
     },
@@ -659,6 +690,9 @@
     },
     "First %lld rows" : {
       "comment" : "Row count cut short by the fetch limit"
+    },
+    "First Row" : {
+
     },
     "Focus" : {
 
@@ -708,6 +742,34 @@
     "Hide earlier versions" : {
 
     },
+    "Import" : {
+
+    },
+    "Import %@" : {
+
+    },
+    "Import Nothing" : {
+
+    },
+    "Import report" : {
+
+    },
+    "Import “%@” into %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Import “%1$@” into %2$@"
+          }
+        }
+      }
+    },
+    "Imports Into" : {
+
+    },
+    "Import…" : {
+
+    },
     "In the folder the store used to be in." : {
 
     },
@@ -733,6 +795,9 @@
 
     },
     "Inverse" : {
+
+    },
+    "Issues" : {
 
     },
     "JSON" : {
@@ -766,6 +831,9 @@
 
     },
     "Length" : {
+
+    },
+    "Line" : {
 
     },
     "Link" : {
@@ -876,6 +944,16 @@
     "New — not in the store until it is committed" : {
 
     },
+    "New: %lld · Updated: %lld · Unchanged: %lld · Failed: %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New: %1$lld · Updated: %2$lld · Unchanged: %3$lld · Failed: %4$lld"
+          }
+        }
+      }
+    },
     "No" : {
       "comment" : "Fetch request prompt: a Boolean value"
     },
@@ -952,6 +1030,9 @@
 
     },
     "Note:" : {
+
+    },
+    "Nothing is imported while a row fails. Skip failing rows to import the rest." : {
 
     },
     "Nothing matches" : {
@@ -1053,6 +1134,9 @@
     "Project Settings…" : {
 
     },
+    "Property for %@" : {
+
+    },
     "Quantifier" : {
       "comment" : "Predicate builder pop-up"
     },
@@ -1134,6 +1218,9 @@
     "Restore…" : {
       "comment" : "Snapshot context menu"
     },
+    "Result" : {
+
+    },
     "Resume Tracking" : {
 
     },
@@ -1148,6 +1235,19 @@
     },
     "Rows" : {
 
+    },
+    "Rows that fail:" : {
+
+    },
+    "Rows: %lld · Columns: %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rows: %1$lld · Columns: %2$lld"
+          }
+        }
+      }
     },
     "Run" : {
       "comment" : "Fetch request prompt button"
@@ -1297,6 +1397,9 @@
 
     },
     "Size All Columns to Fit" : {
+
+    },
+    "Skip Them, Import the Rest" : {
 
     },
     "Snapshot %@" : {
@@ -1549,6 +1652,9 @@
     "UUID" : {
       "comment" : "Placeholder of a UUID field"
     },
+    "Unchanged" : {
+
+    },
     "Undo" : {
 
     },
@@ -1565,6 +1671,9 @@
 
     },
     "Unlinked, by Nullify rules: %@" : {
+
+    },
+    "Update objects that match by URI or by a unique key" : {
 
     },
     "Updated" : {
@@ -1899,6 +2008,9 @@
       "comment" : "Fetch request prompt: a value's kind"
     },
     "—" : {
+
+    },
+    "“%@” has no rows to import." : {
 
     },
     "… %lld more characters not shown." : {

@@ -210,6 +210,30 @@ final class EditingSession {
         await control?.value
     }
 
+    // MARK: Import (IMX-2 – IMX-4)
+
+    /// What importing `rows` into `entity` would do, tried in a scratch context: nothing is staged, and the undo
+    /// stack is left alone. `nil` when there is no editable session.
+    func previewImport(
+        _ rows: [ImportRow], into entity: String, options: ImportOptions
+    ) async throws -> ImportReport? {
+        guard let session else { return nil }
+        return try await session.previewImport(rows, into: entity, options: options)
+    }
+
+    /// Stages the rows of an import as one edit, undone as one; `finished` has the report, whether the rows were
+    /// staged or — all or nothing, and one failed — not.
+    func importRows(
+        _ rows: [ImportRow], into entity: String, options: ImportOptions,
+        finished: @escaping @MainActor (ImportReport) -> Void
+    ) {
+        stage { session in
+            let (report, changes) = try await session.importRows(rows, into: entity, options: options)
+            finished(report)
+            return changes
+        }
+    }
+
     // MARK: Undo
 
     /// An edit the session added to its stack: one entry in the window's.

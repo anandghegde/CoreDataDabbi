@@ -123,7 +123,7 @@ extension ProjectWindowController {
         pasteboard.setString(text, forType: .string)
     }
 
-    private func explainExchangeError(_ error: DabbiError) {
+    func explainExchangeError(_ error: DabbiError) {
         guard let window else { return }
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -138,7 +138,7 @@ extension ProjectWindowController {
 
     // MARK: Validation
 
-    /// Whether an export or copy item can run; `nil` for items that are not about exchange.
+    /// Whether an export, import or copy item can run; `nil` for items that are not about exchange.
     func validateExchangeItem(_ item: NSMenuItem) -> Bool? {
         switch item.action {
         case #selector(exportRows(_:)):
@@ -146,6 +146,8 @@ extension ProjectWindowController {
             return ExportCommands.source(for: scope, context: context, selection: selectedRows) != nil
         case #selector(exportTrackedSession(_:)):
             return !context.tracking.log.isEmpty
+        case #selector(importFile(_:)):
+            return importableEntity != nil
         case #selector(copyRowsAs(_:)), #selector(copyObjectURI(_:)):
             return context.session != nil && !selectedRows.isEmpty
         default:

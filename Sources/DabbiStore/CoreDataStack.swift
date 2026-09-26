@@ -267,6 +267,22 @@ final class CoreDataStack: @unchecked Sendable {
         return try await browse.perform { [browse] in try body(browse, undoManager) }
     }
 
+    /// Runs `body` on a scratch child of the edit context, which is thrown away afterwards: what `body` changes
+    /// goes nowhere, and the edit context's undo stack never hears of it. It sees what is staged, as the edit
+    /// context does. A dry run happens here (IMX-2), so that one that fails leaves the redo stack as it was.
+    func performScratch<T: Sendable>(_ body: @escaping @Sendable (NSManagedObjectContext) throws -> T) async throws -> T
+    {
+        guard isEditable else { throw Self.notEditable }
+        let scratch = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        scratch.parent = browse
+        scratch.undoManager = nil
+        scratch.name = "scratch"
+        return try await scratch.perform {
+            defer { scratch.reset() }
+            return try objcGuarded("The dry run could not be made.") { try body(scratch) }
+        }
+    }
+
     static let notEditable = DabbiError(
         .notEditable, "The store is open read-only.",
         recovery: ["Allow editing to stage changes, then commit them to the store."])
