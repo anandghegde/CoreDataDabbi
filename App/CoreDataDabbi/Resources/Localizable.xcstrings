@@ -25,6 +25,9 @@
         }
       }
     },
+    "%@ Selection" : {
+
+    },
     "%@ of %@" : {
       "localizations" : {
         "en" : {
@@ -330,6 +333,9 @@
     "Browse Simulators…" : {
 
     },
+    "CSV" : {
+
+    },
     "Cached model" : {
 
     },
@@ -411,6 +417,9 @@
     "Columns (%lld)" : {
 
     },
+    "Comma" : {
+
+    },
     "Commit" : {
 
     },
@@ -438,7 +447,13 @@
     "Copy Again" : {
 
     },
+    "Copy As" : {
+
+    },
     "Copy Object ID URI" : {
+
+    },
+    "Copy Object URI" : {
 
     },
     "Copy Path" : {
@@ -459,8 +474,17 @@
     "Count" : {
 
     },
+    "Counts Only" : {
+
+    },
     "Created" : {
       "comment" : "A row the watched app inserted"
+    },
+    "Current View as CSV…" : {
+
+    },
+    "Current View as JSON…" : {
+
     },
     "Customize Toolbar…" : {
 
@@ -582,6 +606,12 @@
     "Elsewhere in the app’s container: %@" : {
 
     },
+    "Embed %lld Levels Deep" : {
+
+    },
+    "Embed Related Objects" : {
+
+    },
     "Empty text, not nil" : {
 
     },
@@ -598,6 +628,9 @@
 
     },
     "Expand" : {
+
+    },
+    "Export" : {
 
     },
     "External storage" : {
@@ -648,6 +681,9 @@
     "Has constraints" : {
 
     },
+    "Header row" : {
+
+    },
     "Help" : {
 
     },
@@ -675,6 +711,9 @@
     "In the folder the store used to be in." : {
 
     },
+    "Include binary data" : {
+
+    },
     "Indexes" : {
 
     },
@@ -694,6 +733,9 @@
 
     },
     "Inverse" : {
+
+    },
+    "JSON" : {
 
     },
     "Join tables" : {
@@ -716,6 +758,9 @@
     },
     "Last change: %lld ms from save to screen" : {
       "comment" : "Tracking latency in the footer tooltip"
+    },
+    "Leave Out" : {
+
     },
     "Left pointing at a deleted object, with no rule to unlink it: %@" : {
 
@@ -769,6 +814,9 @@
 
     },
     "Looks like %@" : {
+
+    },
+    "Markdown Table" : {
 
     },
     "Maximum" : {
@@ -924,6 +972,9 @@
     "Object ID" : {
 
     },
+    "Object URIs" : {
+
+    },
     "On deletion" : {
 
     },
@@ -1056,6 +1107,9 @@
     "Relationships" : {
 
     },
+    "Relationships:" : {
+
+    },
     "Reload Store" : {
 
     },
@@ -1150,6 +1204,21 @@
 
     },
     "Select a simulator" : {
+
+    },
+    "Selected Rows as CSV…" : {
+
+    },
+    "Selected Rows as JSON…" : {
+
+    },
+    "Semicolon" : {
+
+    },
+    "Separator" : {
+
+    },
+    "Separator:" : {
 
     },
     "Services" : {
@@ -1276,6 +1345,12 @@
 
     },
     "SwiftData" : {
+
+    },
+    "Tab" : {
+
+    },
+    "Tab-Separated Text" : {
 
     },
     "Take Snapshot" : {
@@ -1438,6 +1513,15 @@
     "Track Changes" : {
 
     },
+    "Tracked Changes" : {
+
+    },
+    "Tracked Session as CSV…" : {
+
+    },
+    "Tracked Session as JSON…" : {
+
+    },
     "Tracking %@" : {
 
     },
@@ -1540,6 +1624,12 @@
     },
     "When" : {
       "comment" : "Tracking log column: when the change was noticed"
+    },
+    "Whole Entity as CSV…" : {
+
+    },
+    "Whole Entity as JSON…" : {
+
     },
     "Window" : {
 

@@ -40,7 +40,7 @@ let package = Package(
         .target(name: "DabbiQuery", dependencies: ["DabbiModel", "DabbiStore"]),
         .target(name: "DabbiTracking", dependencies: ["DabbiStore", "DabbiSQLite"]),
         .target(name: "DabbiLocator", dependencies: ["DabbiModel", "DabbiSQLite"]),
-        .target(name: "DabbiExchange", dependencies: ["DabbiStore", "DabbiQuery"]),
+        .target(name: "DabbiExchange", dependencies: ["DabbiStore", "DabbiQuery", "DabbiTracking"]),
         .target(name: "DabbiSnapshots", dependencies: ["DabbiStore", "DabbiSQLite"]),
         .target(name: "DabbiDiagnostics", dependencies: ["DabbiStore", "DabbiSQLite"]),
         .target(name: "DabbiProject", dependencies: ["DabbiBase"]),
@@ -116,6 +116,9 @@ let package = Package(
         .testTarget(name: "DabbiProjectTests", dependencies: ["DabbiProject"]),
         .testTarget(
             name: "DabbiSnapshotsTests", dependencies: ["DabbiSnapshots", "DabbiStore", "DabbiTestSupport"]),
+        .testTarget(
+            name: "DabbiExchangeTests",
+            dependencies: ["DabbiExchange", "DabbiStore", "DabbiModel", "DabbiTracking", "DabbiTestSupport"]),
         .testTarget(name: "DabbiLocatorTests", dependencies: ["DabbiLocator", "DabbiTestSupport"]),
         .testTarget(name: "DabbiKitTests", dependencies: ["DabbiKit", "DabbiTestSupport"]),
         .testTarget(name: "FixtureKitTests", dependencies: ["FixtureKit", "DabbiTestSupport"]),

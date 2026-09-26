@@ -4,7 +4,7 @@ import DabbiKit
 /// A project's window: toolbar, the split-view tree, and the commands that are about the project as a whole.
 final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate, NSMenuItemValidation {
     let context: ProjectContext
-    private let panes: ProjectSplitViewController
+    let panes: ProjectSplitViewController
     private let capsule: StatusCapsuleView
     private var observation: ObservationLoop?
     /// The store went missing before the window was on screen: Project Settings waits for it (PRJ-12).
@@ -556,7 +556,7 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         case #selector(showRows(_:)):
             return context.tracking.isShowingLog
         default:
-            return true
+            return validateExchangeItem(item) ?? true
         }
     }
 

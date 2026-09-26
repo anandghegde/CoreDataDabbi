@@ -90,6 +90,22 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item(String(localized: "Cut"), #selector(NSText.cut(_:)), "x"))
         menu.addItem(item(String(localized: "Copy"), #selector(NSText.copy(_:)), "c"))
+        // The grid's selected rows, for a spreadsheet, a script or a bug report (BRW-12).
+        let copyAs = NSMenuItem(title: String(localized: "Copy As"), action: nil, keyEquivalent: "")
+        copyAs.submenu = NSMenu(title: copyAs.title)
+        for (format, title, key) in [
+            (CopyFormat.tsv, String(localized: "Tab-Separated Text"), "c"),
+            (.json, String(localized: "JSON"), ""), (.markdown, String(localized: "Markdown Table"), ""),
+        ] {
+            let entry = item(title, #selector(ProjectWindowController.copyRowsAs(_:)), key, [.command, .option])
+            entry.representedObject = format.rawValue
+            copyAs.submenu?.addItem(entry)
+        }
+        menu.addItem(copyAs)
+        menu.addItem(
+            item(
+                String(localized: "Copy Object URI"), #selector(ProjectWindowController.copyObjectURI(_:)), "c",
+                [.command, .control]))
         menu.addItem(item(String(localized: "Paste"), #selector(NSText.paste(_:)), "v"))
         menu.addItem(item(String(localized: "Select All"), #selector(NSText.selectAll(_:)), "a"))
         return menu
@@ -190,6 +206,8 @@ enum MainMenu {
         // A copy of the store to come back to (§7.3); restoring one is in the sidebar's Snapshots section.
         menu.addItem(item(String(localized: "Take Snapshot…"), #selector(ProjectWindowController.takeSnapshot(_:))))
         menu.addItem(.separator())
+        menu.addItem(export())
+        menu.addItem(.separator())
         // Play and Stop as one item whose title says which it is. Shift-Command-R is Reload Store, so tracking
         // takes the plain one.
         menu.addItem(
@@ -205,6 +223,38 @@ enum MainMenu {
         menu.addItem(.separator())
         menu.addItem(item(String(localized: "Show Rows"), #selector(ProjectWindowController.showRows(_:))))
         return menu
+    }
+
+    /// Data › Export ▸: the selection, the view or the whole entity as CSV or JSON (IMX-1), and the tracked
+    /// session (TRK-5). Which is the item's represented object.
+    private static func export() -> NSMenuItem {
+        let export = NSMenuItem(title: String(localized: "Export"), action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: export.title)
+        for (scope, csv, json) in [
+            (
+                ExportScope.selection, String(localized: "Selected Rows as CSV…"),
+                String(localized: "Selected Rows as JSON…")
+            ),
+            (.view, String(localized: "Current View as CSV…"), String(localized: "Current View as JSON…")),
+            (.entity, String(localized: "Whole Entity as CSV…"), String(localized: "Whole Entity as JSON…")),
+        ] {
+            for (format, title) in [(ExportFormat.csv, csv), (.json, json)] {
+                let entry = item(title, #selector(ProjectWindowController.exportRows(_:)))
+                entry.representedObject = scope.rawValue + "." + format.rawValue
+                menu.addItem(entry)
+            }
+            menu.addItem(.separator())
+        }
+        for (format, title) in [
+            (ExportFormat.csv, String(localized: "Tracked Session as CSV…")),
+            (.json, String(localized: "Tracked Session as JSON…")),
+        ] {
+            let entry = item(title, #selector(ProjectWindowController.exportTrackedSession(_:)))
+            entry.representedObject = format.rawValue
+            menu.addItem(entry)
+        }
+        export.submenu = menu
+        return export
     }
 
     private static func go() -> NSMenu {

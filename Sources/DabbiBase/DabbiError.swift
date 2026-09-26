@@ -132,6 +132,14 @@ extension DabbiError.Code {
     /// A store location no longer leads to a file: the device, the app or the file is gone (PRJ-12).
     public static let locationUnresolved: Self = "locator.unresolved"
 
+    // Export and import
+    /// An export could not be written; nothing was left at the destination (IMX-1).
+    public static let exportFailed: Self = "exchange.exportFailed"
+    /// An import file cannot be read as the format it was opened as (IMX-2).
+    public static let importUnreadable: Self = "exchange.importUnreadable"
+    /// An import was refused: in all-or-nothing mode some row is invalid, and nothing was staged (IMX-3).
+    public static let importRejected: Self = "exchange.importRejected"
+
     // Decoding
     public static let decompressionFailed: Self = "decode.decompressionFailed"
     /// A safety limit (inflated size, recursion depth, row cap) was hit.
