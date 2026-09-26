@@ -14,14 +14,23 @@ public struct ColumnSet: Sendable, Hashable, Codable {
 
 /// One managed object's values at the moment it was read.
 public struct RowSnapshot: Sendable, Hashable, Codable {
+    /// The row's reference. For a row only inserted — which only a pager opened `includingInserted` lists — it
+    /// is a stand-in with primary key 0 and the temporary URI, and names nothing in the store: go by `object`.
     public let ref: ObjectRef
     /// Values in `ColumnSet` order. A property the row's entity does not have is `.null`.
     public let values: [Value]
+    /// The identity a row only inserted was staged under; `nil` for a saved row (EDT-3).
+    public let inserted: PendingObjectID?
 
-    public init(ref: ObjectRef, values: [Value]) {
+    public init(ref: ObjectRef, values: [Value], inserted: PendingObjectID? = nil) {
         self.ref = ref
         self.values = values
+        self.inserted = inserted
     }
+
+    /// The row's object, saved or only inserted: what an edit names it by.
+    public var object: PendingObjectID { inserted ?? PendingObjectID(ref) }
+    public var isInserted: Bool { inserted != nil }
 }
 
 /// A window of rows from a pager.

@@ -15,6 +15,16 @@
         }
       }
     },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
     "%@ (%lld)" : {
       "localizations" : {
         "en" : {
@@ -259,6 +269,9 @@
 
     },
     "A container was too large to search to the end; some stores may be missing." : {
+
+    },
+    "A new object's relationships can be followed here once it is committed." : {
 
     },
     "A snapshot cannot be restored while another app has the store open. Quit it, then restore?" : {
@@ -888,6 +901,12 @@
     "None of this device's apps has a Core Data or SwiftData store the filters allow." : {
 
     },
+    "Not committed yet" : {
+
+    },
+    "Not in the store until it is committed" : {
+
+    },
     "Not known" : {
       "comment" : "Spoken for a tracking cell whose value was never read"
     },
@@ -946,6 +965,9 @@
 
     },
     "Open in Browser" : {
+
+    },
+    "Open in Separate Window" : {
 
     },
     "Open this store in a new project" : {
@@ -1204,6 +1226,9 @@
       "comment" : "Snapshot context menu"
     },
     "Show only simulators that are running" : {
+
+    },
+    "Show or hide this object's relationships" : {
 
     },
     "Show the next place" : {

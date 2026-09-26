@@ -57,6 +57,7 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
             self.askAboutChanges(decide)
         }
         context.editing.onError = { [weak self] error in self?.explainEditError(error) }
+        panes.centre.browse.grid.onOpenObject = { [weak self] object in self?.openWindow(for: object) }
         context.snapshots.onError = { [weak self] error in self?.explainEditError(error) }
         context.onStoreInUse = { [weak self] holders, canQuit, decide in
             guard let self else { return decide(false) }
@@ -176,11 +177,37 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
     /// Stages the deletion of the rows selected in the grid. When the model's delete rules reach further than the
     /// rows, the window says how, and asks first (EDT-2).
     @IBAction func deleteObjects(_ sender: Any?) {
-        let objects = panes.centre.browse.grid.selectedObjects.map(PendingObjectID.init)
+        let objects = panes.centre.browse.grid.selectedPendingObjects
         context.editing.delete(objects) { [weak self] preview in
             await self?.confirmDelete(preview) ?? false
         }
     }
+
+    /// Opens the rows selected in the grid in windows of their own, for comparing side by side (BRW-9).
+    @IBAction func openObjectWindows(_ sender: Any?) {
+        for object in panes.centre.browse.grid.selectedPendingObjects.prefix(Self.windowsOpenedAtOnce) {
+            openWindow(for: object)
+        }
+    }
+
+    /// More than this many windows at once is a mistake, not a comparison.
+    private static let windowsOpenedAtOnce = 10
+
+    /// Brings `object`'s window forward, opening one if it has none. It belongs to the document, and closes
+    /// with it.
+    func openWindow(for object: PendingObjectID) {
+        let open = (document?.windowControllers ?? objectWindows).compactMap { $0 as? ObjectWindowController }
+        if let existing = open.first(where: { $0.object == object }) {
+            existing.showWindow(nil)
+            return
+        }
+        let controller = ObjectWindowController(context: context, object: object)
+        if let document { document.addWindowController(controller) } else { objectWindows.append(controller) }
+        controller.showWindow(nil)
+    }
+
+    /// Detail windows of a window with no document, which nothing else would keep.
+    private var objectWindows: [NSWindowController] = []
 
     /// What the delete rules would do besides deleting the rows, and whether to go ahead.
     private func confirmDelete(_ preview: DeletePreview) async -> Bool {
@@ -497,7 +524,9 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate, NSToo
         case #selector(deleteObjects(_:)):
             // Only from the grid: elsewhere ⌘⌫ is the text field's, deleting to the start of the line.
             return context.editing.isEditable && window?.firstResponder === panes.centre.browse.grid.tableView
-                && !context.tracking.isShowingLog && !panes.centre.browse.grid.selectedObjects.isEmpty
+                && !context.tracking.isShowingLog && !panes.centre.browse.grid.selectedPendingObjects.isEmpty
+        case #selector(openObjectWindows(_:)):
+            return !context.tracking.isShowingLog && !panes.centre.browse.grid.selectedPendingObjects.isEmpty
         case #selector(togglePendingChanges(_:)):
             let shown =
                 panes.centre.item(for: Pane.bottom)?.isCollapsed == false

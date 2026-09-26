@@ -182,6 +182,11 @@ enum MainMenu {
             item(
                 String(localized: "Delete Rows"), #selector(ProjectWindowController.deleteObjects(_:)),
                 String(UnicodeScalar(NSBackspaceCharacter)!)))
+        // One object in a window of its own, for comparing side by side (BRW-9).
+        menu.addItem(
+            item(
+                String(localized: "Open in Separate Window"),
+                #selector(ProjectWindowController.openObjectWindows(_:)), "o", [.command, .option]))
         menu.addItem(
             item(
                 String(localized: "Show Pending Changes"), #selector(ProjectWindowController.togglePendingChanges(_:)),

@@ -230,6 +230,45 @@ import Testing
         await session.close()
     }
 
+    @Test func aPagerAskedForThemPagesInsertedObjectsByTheirStagedIdentity() async throws {
+        let (session, _) = try await open(.basic)
+        let (object, _) = try await session.insertObject(entity: "Sample")
+        try await session.setValue(.string("Brand new"), for: "name", of: object)
+        let pager = try await session.openPager(FetchSpec(entity: "Sample"), includingInserted: true)
+        #expect(pager.count == 41)
+        let page = try await session.page(pager, range: 0..<41)
+        let row = try #require(page.rows.first { $0.isInserted })
+        #expect(row.object == object && row.inserted == object)
+        #expect(row.ref.pk == 0 && row.ref.entity == "Sample")
+        #expect(row.values[page.columns.index(of: "name")!] == .string("Brand new"))
+        #expect(page.rows.filter(\.isInserted).count == 1)
+        // A saved row's object is its reference.
+        #expect(page.rows.first { !$0.isInserted }.map { $0.object.ref != nil } == true)
+
+        // Once the insert is undone its row is missing, as a deleted one is.
+        try await session.undo()
+        try await session.undo()
+        let after = try await session.page(pager, range: 0..<41)
+        #expect(after.rows.count == 40 && after.missing.count == 1)
+        await session.close()
+    }
+
+    @Test func aLimitedFetchIsNotCutShortByInsertedObjects() async throws {
+        let (session, _) = try await open(.basic)
+        for _ in 0..<3 { _ = try await session.insertObject(entity: "Sample") }
+
+        let refs = try await session.references(FetchSpec(entity: "Sample"), limit: 5)
+        #expect(refs.count == 5)
+        let limited = try await session.openPager(FetchSpec(entity: "Sample", limit: 10))
+        #expect(limited.count == 10 && limited.hasMore)
+        let everything = try await session.references(FetchSpec(entity: "Sample"), limit: 100)
+        #expect(everything.count == 40)
+        // With them asked for, they count against the limit like any other row.
+        let both = try await session.openPager(FetchSpec(entity: "Sample", limit: 50), includingInserted: true)
+        #expect(both.count == 43 && !both.hasMore)
+        await session.close()
+    }
+
     @Test func objectsAreReadAsStagedInsertedOnesIncluded() async throws {
         let (session, location) = try await open(.basic)
         // Found before the insert: a fetch with a limit counts an inserted object, which has no reference to

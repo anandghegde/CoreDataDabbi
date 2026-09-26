@@ -56,8 +56,14 @@ final class InspectorModel {
     @ObservationIgnored private var loadedStructure: String?
     @ObservationIgnored private var loadedFrom: ObjectIdentifier?
 
-    init(context: ProjectContext) {
+    /// The one object a detail window shows, whatever the grid has selected (BRW-9); `nil` for the window's
+    /// inspector, which follows the context.
+    var pinned: PendingObjectID?
+    var isPinned: Bool { pinned != nil }
+
+    init(context: ProjectContext, pinned: PendingObjectID? = nil) {
         self.context = context
+        self.pinned = pinned
     }
 
     var tab: Tab {
@@ -79,7 +85,7 @@ final class InspectorModel {
 
     /// The object being looked at — the grid's selection, one picked in the relationships panel (REL-1), or one
     /// only inserted (EDT-3) — and which store it belongs to: what the inspector's reading depends on.
-    var focusedObject: PendingObjectID? { context.inspectedObject }
+    var focusedObject: PendingObjectID? { pinned ?? context.inspectedObject }
     var sessionIdentity: ObjectIdentifier? { context.session.map(ObjectIdentifier.init) }
 
     var facts: EntityFacts? {
@@ -138,13 +144,14 @@ final class InspectorModel {
             details = .noObject
         }
         loadDetails(from: session)
-        if tab == .structure { loadStructure(from: session) }
+        // A detail window has the Details alone.
+        if !isPinned, tab == .structure { loadStructure(from: session) }
     }
 
     // MARK: Details
 
     private func loadDetails(from session: StoreSession?) {
-        guard let session, let object = context.inspectedObject else {
+        guard let session, let object = focusedObject else {
             detailsTask?.cancel()
             loadedObject = nil
             details = .noObject
