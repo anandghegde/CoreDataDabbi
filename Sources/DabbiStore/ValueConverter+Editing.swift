@@ -123,7 +123,8 @@ extension ValueConverter {
     }
 
     func pendingID(of object: NSManagedObject) -> PendingObjectID {
-        PendingObjectID(uri: object.objectID.uriRepresentation(), entity: object.entity.name ?? "")
+        let staged = object.managedObjectContext.flatMap { CoreDataStack.stagedIdentity(of: object.objectID, in: $0) }
+        return PendingObjectID(uri: staged ?? object.objectID.uriRepresentation(), entity: object.entity.name ?? "")
     }
 
     private func inserted(_ object: NSManagedObject) -> PendingChange {

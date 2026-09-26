@@ -190,6 +190,19 @@ final class CoreDataStack: @unchecked Sendable {
                 try objcGuarded("The edit could not be made.", code: .invalidValue) { try body(browse) }
             }
             browse.processPendingChanges()
+            // Everything the edit reads, it reads while its group is open. Reading can change things: a to-one
+            // pointing at an object this edit deleted — through a Deny or No Action rule, which does not
+            // propagate — is cleared by Core Data as it is read ("repairing missing delete propagation"), and a
+            // delete's cascade is not all registered at once. What is left pending when the group closes is
+            // registered in the next one, and undoing that takes back part of this edit: what it deleted stays
+            // deleted, what pointed there comes back, and the commit writes a reference to a row that is gone.
+            var staged: PendingChanges?
+            if case .success = result, changed.isSet {
+                // What the edit was made against, for the commit's conflict check (EDT-10).
+                Self.recordOriginals(in: browse)
+                staged = Self.pendingChanges(in: browse, converter: converter)
+                browse.processPendingChanges()
+            }
             // With `groupsByEvent` off the name has to be set while the group is open.
             undoManager.setActionName(actionName)
             undoManager.endUndoGrouping()
@@ -198,16 +211,17 @@ final class CoreDataStack: @unchecked Sendable {
                 undoManager.disableUndoRegistration()
                 undoManager.undo()
                 browse.processPendingChanges()
+                Self.restoreDeletes(in: browse)
                 undoManager.enableUndoRegistration()
             } else if !changed.isSet {
                 // Empty: popping it undoes nothing and leaves the stack as it was.
                 undoManager.undo()
             } else {
                 Self.adjustUndoDepth(of: browse, by: 1)
-                // What the edit was made against, for the commit's conflict check (EDT-10).
-                Self.recordOriginals(in: browse)
+                Self.rememberDeletes(in: browse)
             }
-            return (try result.get(), Self.pendingChanges(in: browse, converter: converter))
+            let changes = staged.map { Self.withUndoState($0, of: browse) }
+            return (try result.get(), changes ?? Self.pendingChanges(in: browse, converter: converter))
         }
     }
 
@@ -226,6 +240,18 @@ final class CoreDataStack: @unchecked Sendable {
             issues: ValidationTranslator(converter: converter).issues(in: context))
     }
 
+    /// `changes`, with where the undo stack stands now.
+    private static func withUndoState(_ changes: PendingChanges, of context: NSManagedObjectContext) -> PendingChanges {
+        var changes = changes
+        let undoManager = context.undoManager
+        changes.canUndo = undoManager?.canUndo ?? false
+        changes.canRedo = undoManager?.canRedo ?? false
+        changes.undoActionName = undoManager?.undoActionName ?? ""
+        changes.redoActionName = undoManager?.redoActionName ?? ""
+        changes.undoDepth = undoDepth(of: context)
+        return changes
+    }
+
     /// How many edits the undo stack holds. `UndoManager` does not say, and a front end that mirrors the stack
     /// in its own needs to know whether a call added one. Kept in the context's `userInfo`, so that it lives on
     /// the context's queue with the stack it counts. Inside `perform` only.
@@ -239,6 +265,40 @@ final class CoreDataStack: @unchecked Sendable {
 
     static func resetUndoDepth(of context: NSManagedObjectContext) {
         context.userInfo[undoDepthKey] = 0
+        context.userInfo[deletesKey] = nil
+    }
+
+    /// Remembers what stands deleted at the current depth of the undo stack, once an edit is on it.
+    ///
+    /// Core Data's own undo does not always put deletes back. Taking back an edit of an object whose to-one
+    /// still leads to a deleted one — a Deny or No Action rule leaves it there until the commit — restores
+    /// that to-one, and with it the deleted object: undeleted, although the edit that deleted it is still on
+    /// the stack. Delete an organisation, cascading to its departments, rename one of their employees, undo the
+    /// rename, and the departments are back while the organisation is gone. So each depth remembers its deletes,
+    /// and undo and redo put back the ones Core Data forgot (`restoreDeletes(in:)`).
+    static func rememberDeletes(in context: NSManagedObjectContext) {
+        let depth = undoDepth(of: context)
+        var deletes = context.userInfo[deletesKey] as? [Int: Set<NSManagedObjectID>] ?? [:]
+        // A new edit forgets whatever could have been redone past it.
+        deletes = deletes.filter { $0.key < depth }
+        deletes[depth] = Set(context.deletedObjects.map(\.objectID))
+        context.userInfo[deletesKey] = deletes
+    }
+
+    /// Deletes again what stood deleted at the current depth and no longer does, registering nothing: the
+    /// delete belongs to the edit on the stack that made it, and undoing that edit takes it back as ever.
+    static func restoreDeletes(in context: NSManagedObjectContext) {
+        let deletes = context.userInfo[deletesKey] as? [Int: Set<NSManagedObjectID>] ?? [:]
+        let deleted = Set(context.deletedObjects.map(\.objectID))
+        let forgotten = (deletes[undoDepth(of: context)] ?? []).subtracting(deleted)
+        guard !forgotten.isEmpty, let undoManager = context.undoManager else { return }
+        let registering = undoManager.isUndoRegistrationEnabled
+        if registering { undoManager.disableUndoRegistration() }
+        for id in forgotten {
+            if let object = try? context.existingObject(with: id) { context.delete(object) }
+        }
+        context.processPendingChanges()
+        if registering { undoManager.enableUndoRegistration() }
     }
 
     /// Takes back the context's last edit, if it has one. The context's own `undo()`, not the manager's: it
@@ -248,12 +308,14 @@ final class CoreDataStack: @unchecked Sendable {
         guard context.undoManager?.canUndo == true else { return }
         context.undo()
         adjustUndoDepth(of: context, by: -1)
+        restoreDeletes(in: context)
     }
 
     static func redoLastEdit(in context: NSManagedObjectContext) {
         guard context.undoManager?.canRedo == true else { return }
         context.redo()
         adjustUndoDepth(of: context, by: 1)
+        restoreDeletes(in: context)
     }
 
     /// Forgets every edit the context could undo or redo.
@@ -263,6 +325,35 @@ final class CoreDataStack: @unchecked Sendable {
     }
 
     private static let undoDepthKey = "org.coredatadabbi.undoDepth"
+    private static let deletesKey = "org.coredatadabbi.deletes"
+    private static let stagedIdentitiesKey = "org.coredatadabbi.staged-identities"
+
+    /// Keeps each inserted object named by the identity it was staged under, when a save that failed has given
+    /// it a permanent ID already: the object is still only staged, and whoever holds its staged identity — the
+    /// grid, a detail window, the next edit — still means it. Returns the staged URIs of the objects that moved,
+    /// with their IDs now.
+    static func keepStagedIdentities(
+        of inserted: [(object: NSManagedObject, staged: PendingObjectID)], in context: NSManagedObjectContext
+    ) -> [URL: NSManagedObjectID] {
+        var identities = context.userInfo[stagedIdentitiesKey] as? [NSManagedObjectID: URL] ?? [:]
+        var moved: [URL: NSManagedObjectID] = [:]
+        for (object, staged) in inserted where object.objectID.uriRepresentation() != staged.uri {
+            identities[object.objectID] = staged.uri
+            moved[staged.uri] = object.objectID
+        }
+        context.userInfo[stagedIdentitiesKey] = identities
+        return moved
+    }
+
+    /// The identity `id` was staged under, when a failed save has given it another.
+    static func stagedIdentity(of id: NSManagedObjectID, in context: NSManagedObjectContext) -> URL? {
+        (context.userInfo[stagedIdentitiesKey] as? [NSManagedObjectID: URL])?[id]
+    }
+
+    /// Everything staged was written, or let go.
+    static func forgetStagedIdentities(in context: NSManagedObjectContext) {
+        context.userInfo[stagedIdentitiesKey] = nil
+    }
 
     /// Set from a notification posted synchronously on the context's own queue, and read there.
     private final class ChangeFlag: @unchecked Sendable {

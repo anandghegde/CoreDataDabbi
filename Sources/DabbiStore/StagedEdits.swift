@@ -128,10 +128,13 @@ extension StoreSession {
         try ensureOpen()
         guard stack.isEditable else { return .none }
         try await stack.performEditing { context, _ in
-            context.rollback()
+            // Not `rollback()`: it puts every object back from its snapshot, and after some runs of delete, undo
+            // and redo a snapshot still leads to an object the context has let go, which Core Data throws on. The
+            // context holds nothing but what is staged, so forgetting every object is the same discard.
+            context.reset()
             CoreDataStack.clearUndo(of: context)
             CoreDataStack.forgetOriginals(in: context)
-            context.refreshAllObjects()
+            CoreDataStack.forgetStagedIdentities(in: context)
         }
         insertedObjectIDs.removeAll()
         return .none
@@ -174,7 +177,8 @@ extension StoreSession {
         let conflicts = try await commitConflicts()
         guard conflicts.isEmpty else { throw Self.conflictError(conflicts) }
         let (converter, translator) = (stack.converter, ValidationTranslator(converter: stack.converter))
-        let (counts, insertedRefs) = try await stack.performEditing { context, _ in
+        let (saved, moved) = try await stack.performEditing {
+            context, _ -> (Result<Saved, DabbiError>, [URL: NSManagedObjectID]) in
             let counts = (
                 inserted: context.insertedObjects.count, updated: context.updatedObjects.count,
                 deleted: context.deletedObjects.count
@@ -183,19 +187,24 @@ extension StoreSession {
             let inserted = context.insertedObjects.map { (object: $0, staged: converter.pendingID(of: $0)) }
             do {
                 try objcGuarded("The store refused the commit.", code: .commitFailed) { try context.save() }
-            } catch let error as DabbiError {
-                throw error
             } catch {
-                throw Self.commitError(error, translator: translator)
+                // A save that fails can have given the inserted objects their permanent IDs already. They are
+                // still staged, under the identities they were staged under: those keep naming them.
+                let moved = CoreDataStack.keepStagedIdentities(of: inserted, in: context)
+                let failure = error as? DabbiError ?? Self.commitError(error, translator: translator)
+                return (.failure(failure), moved)
             }
             CoreDataStack.clearUndo(of: context)
             CoreDataStack.forgetOriginals(in: context)
+            CoreDataStack.forgetStagedIdentities(in: context)
             var insertedRefs: [PendingObjectID: ObjectRef] = [:]
             for (object, staged) in inserted {
                 insertedRefs[staged] = ObjectRef(uri: object.objectID.uriRepresentation())
             }
-            return (counts, insertedRefs)
+            return (.success(Saved(counts: counts, insertedRefs: insertedRefs)), [:])
         }
+        insertedObjectIDs.merge(moved) { $1 }
+        let (counts, insertedRefs) = try saved.map { ($0.counts, $0.insertedRefs) }.get()
         insertedObjectIDs.removeAll()
         invalidate()
         return CommitSummary(
@@ -299,6 +308,12 @@ extension StoreSession {
             throw DabbiError(.objectNotFound, "\(object?.description ?? "The object") no longer exists.")
         }
         return found
+    }
+
+    /// What a commit's save wrote, counted before it, and the references the inserted objects were given.
+    struct Saved: Sendable {
+        let counts: (inserted: Int, updated: Int, deleted: Int)
+        let insertedRefs: [PendingObjectID: ObjectRef]
     }
 
     /// A failed save, as the error a front end explains. Row values never go into it, only which object, which

@@ -1,4 +1,6 @@
+import CoreData
 import DabbiBase
+import DabbiModel
 import DabbiSQLite
 import DabbiTestSupport
 import FixtureKit
@@ -241,5 +243,91 @@ import Testing
         #expect(boss == .integer(people[1].pk))
         await mine.close()
         await theirs.close()
+    }
+
+    /// Somebody else saves between the commit's comparison and its save: the save fails, after Core Data has
+    /// given the inserted objects their permanent IDs. They are still staged, and still named as they were
+    /// staged, so the commit that follows the choice reports them under those names.
+    @Test func aSaveRacedByAnotherWriterKeepsWhatIsInsertedStaged() async throws {
+        let (mine, theirs, location) = try await open(.basic)
+        await theirs.close()
+        let ref = try #require(try await rows(mine, 1).first)
+        try await mine.setValue(.string("Mine"), for: "name", of: PendingObjectID(ref))
+        let (inserted, _) = try await mine.insertObject(entity: "Sample")
+        try await mine.setValue(.string("Inserted"), for: "name", of: inserted)
+
+        let racer = try Racer(location, pk: ref.pk)
+        defer { racer.stop() }
+        let error = await #expect(throws: DabbiError.self) { try await mine.commit() }
+        #expect(error?.code == .commitConflict)
+        #expect(racer.raced)
+
+        let staged = try await mine.pendingChanges().changes
+        #expect(staged.contains { $0.object == inserted && $0.kind == .inserted }, "named as it was staged")
+        try await mine.setValue(.string("Inserted again"), for: "name", of: inserted)
+        try await mine.resolveConflicts([PendingObjectID(ref): .mine])
+        let summary = try await mine.commit()
+        let saved = try #require(summary.insertedRefs[inserted])
+        let savedName = try fileValue(location, "SELECT ZNAME FROM ZSAMPLE WHERE Z_PK = \(saved.pk)")
+        #expect(savedName == .text("Inserted again"))
+        #expect(try name(location, ref) == .text("Mine"))
+        await mine.close()
+    }
+}
+
+/// Saves a name of its own to one row from inside the next save of another coordinator's context to the same
+/// store: after the commit's comparison, before its write.
+private final class Racer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var fired = false
+    private var observer: (any NSObjectProtocol)?
+    private let context: NSManagedObjectContext
+
+    var raced: Bool { lock.withLock { fired } }
+
+    init(_ location: FixtureLocation, pk: Int64) throws {
+        let connection = try SQLiteConnection(readOnly: location.storeURL)
+        defer { connection.close() }
+        let model = try ModelLoader.resolve(
+            storeURL: location.storeURL, modelURL: location.modelURL, connection: connection
+        ).model
+        let coordinator = NSPersistentStoreCoordinator(managedObjectModel: model)
+        _ = try coordinator.addPersistentStore(type: .sqlite, at: location.storeURL)
+        context = NSManagedObjectContext(.privateQueue)
+        context.persistentStoreCoordinator = coordinator
+        let storeURL = location.storeURL.standardizedFileURL
+        observer = NotificationCenter.default.addObserver(
+            forName: .NSManagedObjectContextWillSave, object: nil, queue: nil
+        ) { [weak self] note in
+            guard let self, let saving = note.object as? NSManagedObjectContext, saving !== self.context,
+                saving.persistentStoreCoordinator?.persistentStores.first?.url?.standardizedFileURL == storeURL,
+                self.fireOnce()
+            else { return }
+            self.save(pk: pk)
+        }
+    }
+
+    private func fireOnce() -> Bool {
+        lock.withLock {
+            defer { fired = true }
+            return !fired
+        }
+    }
+
+    private func save(pk: Int64) {
+        context.performAndWait {
+            let request = NSFetchRequest<NSManagedObject>(entityName: "Sample")
+            guard let row = (try? context.fetch(request))?.first(where: { Self.pk(of: $0) == pk }) else { return }
+            row.setValue("Theirs", forKey: "name")
+            try? context.save()
+        }
+    }
+
+    private static func pk(of object: NSManagedObject) -> Int64? {
+        Int64(object.objectID.uriRepresentation().lastPathComponent.dropFirst())
+    }
+
+    func stop() {
+        if let observer { NotificationCenter.default.removeObserver(observer) }
     }
 }

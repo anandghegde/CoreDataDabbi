@@ -197,6 +197,61 @@ import Testing
         await session.close()
     }
 
+    /// Found by the corruption fuzzer (M3-11). Undoing a delete that cascaded past a staged edit put the edit
+    /// back and left the delete: the department's to-one, read after the edit's undo group had closed, was
+    /// cleared by Core Data then, and the clearing landed in the next group.
+    @Test func undoingACascadeKeepsTheEditsStagedBeforeIt() async throws {
+        let (session, _) = try await open(.company)
+        let department = try await firstRow(session, "Department")
+        guard case .toOne(let organisation?, _) = try await session.object(department)["organisation"] else {
+            Issue.record("the department has no organisation")
+            return
+        }
+        let manager = try await firstRow(session, "Manager")
+        try await session.setValue(.toOne(manager, display: nil), for: "head", of: PendingObjectID(department))
+        let edited = try await session.pendingChanges()
+
+        let deleted = try await session.delete([PendingObjectID(organisation)])
+        #expect(deleted.change(for: PendingObjectID(department))?.kind == .deleted)
+        #expect(try await session.undo().changes == edited.changes)
+        guard case .toOne(let head, _) = try await session.object(department)["head"] else {
+            Issue.record("the head is not a to-one")
+            return
+        }
+        #expect(head == manager)
+        #expect(try await session.object(organisation)["name"] != nil)
+        await session.close()
+    }
+
+    /// Found by the corruption fuzzer (M3-11). Taking back an edit of an object whose to-one still leads to a
+    /// deleted one — a Deny rule keeps it until the commit — restored the deleted object with it, and a commit
+    /// then wrote a department of an organisation that was gone.
+    @Test func undoingAnEditBesideADeleteKeepsTheDelete() async throws {
+        let (session, location) = try await open(.company)
+        let department = try await firstRow(session, "Department")
+        guard case .toOne(let organisation?, _) = try await session.object(department)["organisation"] else {
+            Issue.record("the department has no organisation")
+            return
+        }
+        let employee = try #require(
+            try await session.related(to: department, through: "employees").items.first?.ref)
+        let deleted = try await session.delete([PendingObjectID(organisation)])
+        #expect(deleted.change(for: PendingObjectID(department))?.kind == .deleted)
+
+        try await session.setValue(.string("Renamed"), for: "name", of: PendingObjectID(employee))
+        #expect(try await session.undo().changes == deleted.changes)
+        #expect(try await session.redo().change(for: PendingObjectID(employee))?.kind == .updated)
+        #expect(try await session.undo().changes == deleted.changes)
+        #expect(try await session.undo().isEmpty)
+
+        // Nothing to commit, and nothing was: the file is as it was.
+        #expect(try await session.commit().total == 0)
+        await session.close()
+        let problems = try StoreSoundness.fileProblems(
+            of: location.storeURL, model: session.info.model, schema: session.info.schemaMap)
+        #expect(problems.isEmpty)
+    }
+
     @Test func deletedRowsLeaveTheirPagesUntilTheyAreUndone() async throws {
         let (session, _) = try await open(.basic)
         let pager = try await session.openPager(FetchSpec(entity: "Sample"))
