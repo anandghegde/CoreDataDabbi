@@ -104,6 +104,9 @@ extension DabbiError.Code {
     public static let commitFailed: Self = "edit.commitFailed"
     /// Something the commit has to do first — the pre-commit backup — failed; nothing was written.
     public static let commitPreparationFailed: Self = "edit.commitPreparationFailed"
+    /// A commit guard stands — the store is mirrored to CloudKit, or another process has it open — and was not
+    /// acknowledged; nothing was written (EDT-10, EDT-11).
+    public static let commitUnconfirmed: Self = "edit.commitUnconfirmed"
 
     // Projects
     public static let projectUnreadable: Self = "project.unreadable"

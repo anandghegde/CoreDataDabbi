@@ -40,6 +40,14 @@ final class EditingSession {
     @ObservationIgnored var onError: ((DabbiError) -> Void)?
     /// A commit is over, written or not: the first one of a session will have taken a backup either way.
     @ObservationIgnored var onCommitFinished: (() -> Void)?
+    /// A commit's guards stand — the store is mirrored to CloudKit, or other processes have it open — and have not
+    /// been put to the user this session (EDT-10, EDT-11). Answers whether to commit. Without it such a commit is
+    /// refused.
+    @ObservationIgnored var confirmGuards: (@MainActor (CommitGuards) async -> Bool)?
+    /// The store changed underneath staged edits (EDT-10). Answers whose values stand, per object, or `nil` to
+    /// leave everything staged and not commit. Without it the commit fails with the conflict.
+    @ObservationIgnored var resolveConflicts:
+        (@MainActor ([CommitConflict]) async -> [PendingObjectID: CommitConflict.Choice]?)?
 
     /// The window's undo manager while the store is editable. Grouped by event, as AppKit's own are, so the text
     /// fields' typing can share it.
@@ -51,6 +59,9 @@ final class EditingSession {
     @ObservationIgnored private var control: Task<Void, Never>?
     /// Bumped per attached session; anything that arrives from an earlier one is dropped.
     @ObservationIgnored private var generation = 0
+    /// The guards the user has said to commit through, in this session: CloudKit is asked about once, and a
+    /// process only when it is new.
+    @ObservationIgnored private var acknowledged = CommitGuards.clear
 
     // MARK: What the window asks
 
@@ -76,6 +87,7 @@ final class EditingSession {
         detach()
         self.session = session
         self.backup = backup
+        acknowledged = .clear
     }
 
     /// The session is closing, or has been reopened read-only: whatever it staged goes with it.
@@ -83,6 +95,7 @@ final class EditingSession {
         generation += 1
         session = nil
         backup = nil
+        acknowledged = .clear
         isCommitting = false
         undoManager.removeAllActions(withTarget: self)
         guard changes != .none else { return }
@@ -218,6 +231,11 @@ final class EditingSession {
 
     /// Writes everything staged to the store, once the session's backup is taken and verified (EDT-9).
     ///
+    /// First the guards are checked (EDT-10, EDT-11), and put to `confirmGuards` when they stand and the user has
+    /// not been asked about them yet. A commit refused because the store changed underneath the edits puts the
+    /// conflicts to `resolveConflicts`, settles them as answered and commits again. Declined either way, nothing
+    /// is written, everything stays staged, and it is not an error.
+    ///
     /// - Returns: a task that finishes with whether the commit went through; a caller that has something to do
     ///   afterwards — close, reload, lock — waits for it.
     @discardableResult
@@ -229,8 +247,13 @@ final class EditingSession {
         let task = Task { [weak self] () -> Bool in
             await previous?.value
             do {
-                let summary = try await session.commit(after: backup)
-                guard let self, self.generation == generation else { return false }
+                guard let self, let summary = try await self.commitConfirmed(session, backup: backup) else {
+                    guard let self, self.generation == generation else { return false }
+                    self.isCommitting = false
+                    self.onCommitFinished?()
+                    return false
+                }
+                guard self.generation == generation else { return false }
                 self.isCommitting = false
                 self.lastCommit = summary
                 self.undoManager.removeAllActions(withTarget: self)
@@ -249,6 +272,33 @@ final class EditingSession {
         }
         control = Task { _ = await task.value }
         return task
+    }
+
+    /// Commits through the guards and the conflicts, asking about each. `nil` when the user declined.
+    private func commitConfirmed(_ session: StoreSession, backup: PreCommitBackup) async throws -> CommitSummary? {
+        let guards = await CommitGuards.check(session, storeURL: backup.store)
+        if !acknowledged.covers(guards) {
+            // Unasked, the commit refuses them itself.
+            if let confirmGuards {
+                guard await confirmGuards(guards) else { return nil }
+                acknowledged = acknowledged.merging(guards)
+            }
+        }
+        do {
+            return try await session.commit(after: backup, acknowledging: acknowledged)
+        } catch let error as DabbiError where error.code == .commitConflict {
+            guard let resolveConflicts else { throw error }
+            // A uniqueness constraint is a conflict too, and not one a choice settles.
+            let conflicts = try await session.commitConflicts()
+            guard !conflicts.isEmpty else { throw error }
+            guard let choices = await resolveConflicts(conflicts) else { return nil }
+            let settled = try await session.resolveConflicts(choices)
+            guard self.session === session else { return nil }
+            // Settling emptied the session's undo stack: the edits on it were made against rows that changed.
+            undoManager.removeAllActions(withTarget: self)
+            show(settled)
+            return try await session.commit(after: backup, acknowledging: acknowledged)
+        }
     }
 
     /// Returns once everything sent to the session has been done. Nothing in the app waits for that; the tests
