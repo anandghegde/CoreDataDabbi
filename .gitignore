@@ -29,3 +29,6 @@ App/Config/Local.xcconfig
 .idea/
 .serena/
 .codegraph/
+
+# Claude Code agent worktrees
+.claude/worktrees/
